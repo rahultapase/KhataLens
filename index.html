@@ -7,6 +7,15 @@
     <meta name="theme-color" content="#1f2b5c" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>KhataLens: udhaar khata to ledger, on your laptop</title>
+    <script>
+      // Set the theme before first paint so there is no flash. Saved choice wins, else the OS setting.
+      (function () {
+        var t = null;
+        try { t = localStorage.getItem("khatalens.theme"); } catch (e) {}
+        if (t !== "dark" && t !== "light") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = t;
+      })();
+    </script>
   </head>
   <body>
     <header class="topbar">
@@ -24,6 +33,10 @@
         <div class="topbar-meta">
           <span class="chip chip-private" title="The photo and ledger never leave this computer">On-device · no cloud</span>
           <p id="gemma-status" class="status" role="status" aria-live="polite" data-state="checking">Checking Gemma...</p>
+          <button id="theme-toggle" type="button" class="theme-toggle" aria-pressed="false" aria-label="Dark mode" title="Toggle dark mode">
+            <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
         </div>
       </div>
     </header>

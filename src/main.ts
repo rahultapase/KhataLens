@@ -109,6 +109,34 @@ $("clear-ledger").addEventListener("click", () => {
   if (window.confirm(`Clear all ${ledger.size} entries? This can't be undone.`)) ledger.clear();
 });
 
+// ---------- Theme ----------
+
+const THEME_KEY = "khatalens.theme";
+const themeBtn = $<HTMLButtonElement>("theme-toggle");
+const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+
+function paintTheme(): void {
+  const dark = document.documentElement.dataset.theme === "dark";
+  themeBtn.setAttribute("aria-pressed", String(dark));
+  themeBtn.title = dark ? "Switch to light mode" : "Switch to dark mode";
+  themeMeta?.setAttribute("content", dark ? "#0d1220" : "#1f2b5c");
+}
+paintTheme();
+
+themeBtn.addEventListener("click", () => {
+  const root = document.documentElement;
+  const next = root.dataset.theme === "dark" ? "light" : "dark";
+  root.classList.add("theme-switching");
+  root.dataset.theme = next;
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    // storage blocked; theme lasts for this visit
+  }
+  paintTheme();
+  window.setTimeout(() => root.classList.remove("theme-switching"), 260);
+});
+
 // ---------- Gemma status ----------
 
 const STATUS_TEXT: Record<GemmaStatus, string> = {
