@@ -1,6 +1,7 @@
 import "./styles.css";
 import { extractEntries, GemmaParseError, warmUp, type GemmaStatus } from "./gemma.ts";
 import { fetchSample, prepareImage, type PreparedImage } from "./image.ts";
+import { LedgerView } from "./ledgerView.ts";
 
 function $<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -21,6 +22,21 @@ const errorMsg = $("read-error-msg");
 const errorRawWrap = $("read-error-raw-wrap");
 const errorRaw = $("read-error-raw");
 const extractJson = $("extract-json");
+
+const ledger = new LedgerView(
+  $<HTMLTableSectionElement>("ledger-body"),
+  $("ledger-wrap"),
+  $("ledger-empty"),
+  $("balance-cards"),
+  $("grand-total"),
+  $("entry-count"),
+);
+
+$("add-row").addEventListener("click", () => ledger.addBlank());
+$("clear-ledger").addEventListener("click", () => {
+  if (ledger.size === 0) return;
+  if (window.confirm(`Clear all ${ledger.size} entries? This can't be undone.`)) ledger.clear();
+});
 
 let current: PreparedImage | null = null;
 let previewUrl: string | null = null;
@@ -87,7 +103,9 @@ readBtn.addEventListener("click", async () => {
     const result = await extractEntries(current.base64);
     const secs = ((performance.now() - started) / 1000).toFixed(1);
     extractJson.textContent = JSON.stringify(result, null, 2);
-    progress.textContent = `Read ${result.entries.length} entries in ${secs} s.`;
+    ledger.addFromGemma(result.entries);
+    const skipped = result.unreadable_lines > 0 ? ` ${result.unreadable_lines} line(s) were unreadable; add them by hand.` : "";
+    progress.textContent = `Read ${result.entries.length} entries in ${secs} s and added them to the ledger.${skipped}`;
     if (result.entries.length === 0) {
       showError("Gemma couldn't find any entries. Try a sharper, well-lit photo of one page.");
     }

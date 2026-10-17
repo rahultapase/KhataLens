@@ -38,9 +38,46 @@
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="extract-title">
-        <h2 id="extract-title">Extracted entries</h2>
-        <pre id="extract-json">Nothing read yet.</pre>
+      <section class="panel" aria-labelledby="ledger-title">
+        <div class="panel-head">
+          <h2 id="ledger-title">2. Check the ledger</h2>
+          <span id="entry-count" class="muted"></span>
+        </div>
+        <p class="hint">Gemma can misread handwriting. Fix anything here; balances update as you type.</p>
+        <p id="ledger-empty" class="empty">No entries yet. Read a khata page, or add a row by hand.</p>
+        <div id="ledger-wrap" class="table-wrap">
+          <table class="ledger">
+            <caption class="visually-hidden">Khata entries</caption>
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Customer</th>
+                <th scope="col">Item</th>
+                <th scope="col">Amount (₹)</th>
+                <th scope="col">Type</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="ledger-body"></tbody>
+          </table>
+        </div>
+        <div class="ledger-actions">
+          <button id="add-row" type="button" class="btn btn-secondary">Add row</button>
+          <button id="clear-ledger" type="button" class="btn btn-ghost">Clear ledger</button>
+        </div>
+        <details class="raw">
+          <summary>Gemma's raw reading</summary>
+          <pre id="extract-json">Nothing read yet.</pre>
+        </details>
+      </section>
+
+      <section class="panel" aria-labelledby="balances-title">
+        <h2 id="balances-title">3. Who owes what</h2>
+        <ol id="balance-cards" class="balance-cards"></ol>
+        <p class="grand-total">
+          <span>Total to collect</span>
+          <strong id="grand-total">₹0</strong>
+        </p>
       </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
