@@ -1,0 +1,19 @@
+{
+  "name": "khatalens",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Photograph a handwritten udhaar khata, Gemma 4 reads it locally into a ledger and writes polite Hinglish reminders.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vite": "8.3.4"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
