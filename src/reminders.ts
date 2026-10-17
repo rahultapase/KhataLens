@@ -1,7 +1,7 @@
-// Reminder cards: one per customer who owes money.
+// Hisaab view: customer balance list (master) + reminder composer (detail).
 // Model text only ever goes into textarea.value / textContent.
 import { writeReminder, type Tone } from "./gemma.ts";
-import { formatINR, type CustomerBalance } from "./ledger.ts";
+import { formatINR, totalOwed, type CustomerBalance } from "./ledger.ts";
 import { isValidUpi, shopName, upiLink, type Settings } from "./settings.ts";
 
 interface ReminderState {
@@ -27,7 +27,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-/** The message as sent: Gemma's text plus a plain-text UPI line if one is set. */
+/** Gemma's text plus a plain-text UPI line if one is set. */
 export function finalMessage(text: string, settings: Settings): string {
   const body = text.trim();
   const upi = settings.upi.trim();
@@ -59,27 +59,43 @@ async function copyText(text: string): Promise<boolean> {
   return ok;
 }
 
-export class RemindersView {
+function stateOf(c: CustomerBalance): "owes" | "advance" | "settled" {
+  return c.balance > 0 ? "owes" : c.balance < 0 ? "advance" : "settled";
+}
+
+export class HisaabView {
   private state = new Map<string, ReminderState>();
   private customers: CustomerBalance[] = [];
+  private selected: string | null = null;
 
   constructor(
     private list: HTMLElement,
-    private empty: HTMLElement,
+    private totalEl: HTMLElement,
+    private summaryEl: HTMLElement,
+    private composer: HTMLElement,
+    private section: HTMLElement,
     private getSettings: () => Settings,
   ) {}
 
   update(customers: CustomerBalance[]): void {
-    this.customers = customers.filter((c) => c.balance > 0);
-    this.render();
+    this.customers = customers;
+    const owing = customers.filter((c) => c.balance > 0);
+    if (!this.selected || !customers.some((c) => c.key === this.selected)) {
+      this.selected = owing[0]?.key ?? customers[0]?.key ?? null;
+    }
+    this.section.dataset.empty = String(customers.length === 0);
+    this.totalEl.textContent = formatINR(totalOwed(customers));
+    this.summaryEl.textContent =
+      customers.length === 0
+        ? "No customers yet"
+        : `${owing.length} of ${customers.length} customers owe money`;
+    this.renderList();
+    this.renderComposer();
   }
 
-  render(): void {
-    const active = document.activeElement;
-    const focusKey = active instanceof HTMLElement ? active.dataset.focusKey : undefined;
-    this.list.replaceChildren(...this.customers.map((c) => this.card(c)));
-    this.empty.hidden = this.customers.length > 0;
-    if (focusKey) this.list.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(focusKey)}"]`)?.focus();
+  /** Re-render after settings change (shop name / UPI). */
+  refresh(): void {
+    this.renderComposer();
   }
 
   private stateFor(key: string): ReminderState {
@@ -91,50 +107,131 @@ export class RemindersView {
     return s;
   }
 
-  private card(c: CustomerBalance): HTMLLIElement {
+  private select(key: string): void {
+    this.selected = key;
+    this.renderList();
+    this.renderComposer();
+    this.list.querySelector<HTMLButtonElement>(`button[data-key="${CSS.escape(key)}"]`)?.focus();
+  }
+
+  private renderList(): void {
+    const items = this.customers.map((c) => {
+      const st = stateOf(c);
+      const s = this.state.get(c.key);
+      const btn = el(
+        "button",
+        { type: "button", className: "cust" },
+        el("span", { className: "cust-name" }, c.name),
+        el("span", { className: "cust-amount" }, st === "settled" ? "₹0" : formatINR(Math.abs(c.balance))),
+        el(
+          "span",
+          { className: "cust-detail" },
+          `Udhaar ${formatINR(c.udhaar)} · Jama ${formatINR(c.jama)}`,
+        ),
+        el(
+          "span",
+          { className: "cust-note" },
+          s?.text ? "Reminder drafted" : st === "owes" ? "baaki" : st === "advance" ? "advance paid" : "hisaab clear",
+        ),
+      );
+      btn.dataset.key = c.key;
+      btn.dataset.state = st;
+      if (s?.text) btn.dataset.drafted = "true";
+      if (c.key === this.selected) btn.setAttribute("aria-current", "true");
+      btn.addEventListener("click", () => this.select(c.key));
+      return el("li", {}, btn);
+    });
+    this.list.replaceChildren(...items);
+  }
+
+  private renderComposer(): void {
+    const c = this.customers.find((x) => x.key === this.selected);
+    if (!c) {
+      this.composer.replaceChildren(
+        el("div", { className: "composer-empty" },
+          el("p", { className: "composer-empty-title" }, "Reminders appear here"),
+          el("p", {}, "Read a khata page and pick a customer who owes money. Gemma drafts a short, respectful Hinglish message."),
+        ),
+      );
+      return;
+    }
+
     const s = this.stateFor(c.key);
     const settings = this.getSettings();
     const shop = shopName(settings);
     const amount = formatINR(c.balance);
-    const slug = c.key.replace(/[^a-z0-9]+/g, "-") || "customer";
-    const uid = `${slug}-${Math.abs(hash(c.key))}`;
 
-    const toneId = `tone-${uid}`;
-    const tone = el("select", { id: toneId });
-    tone.dataset.focusKey = `${c.key}:tone`;
-    for (const t of TONES) tone.append(el("option", { value: t.value, selected: t.value === s.tone }, t.label));
-    tone.addEventListener("change", () => {
-      s.tone = tone.value as Tone;
-    });
+    const head = el(
+      "div",
+      { className: "composer-head" },
+      el("div", {},
+        el("p", { className: "composer-kicker" }, "Reminder for"),
+        el("h3", { id: "composer-title" }, c.name),
+      ),
+      el("p", { className: "composer-amount" },
+        el("span", {}, c.balance > 0 ? amount : formatINR(Math.abs(c.balance))),
+        el("small", {}, c.balance > 0 ? "baaki" : c.balance < 0 ? "advance paid" : "hisaab clear"),
+      ),
+    );
 
-    const write = el("button", { type: "button", className: "btn btn-primary", disabled: s.busy },
-      s.busy ? "Gemma likh raha hai..." : s.text ? "Write again" : "Write reminder");
-    write.dataset.focusKey = `${c.key}:write`;
+    if (c.balance <= 0) {
+      this.composer.replaceChildren(
+        head,
+        el("p", { className: "composer-clear" }, `${c.name} doesn't owe anything right now, so there's nothing to remind.`),
+      );
+      return;
+    }
+
+    // Tone: a segmented radio group
+    const tones = el("fieldset", { className: "segmented" }, el("legend", {}, "Tone"));
+    for (const t of TONES) {
+      const id = `tone-${t.value}`;
+      const input = el("input", { type: "radio", name: "tone", id, value: t.value, checked: s.tone === t.value, disabled: s.busy });
+      input.addEventListener("change", () => {
+        if (input.checked) s.tone = t.value;
+      });
+      tones.append(input, el("label", { htmlFor: id }, t.label));
+    }
+
+    const write = el(
+      "button",
+      { type: "button", className: "btn btn-primary btn-write", disabled: s.busy },
+      s.busy ? "Gemma likh raha hai..." : s.text ? "Write again" : "Write reminder with Gemma",
+    );
     write.setAttribute("aria-busy", String(s.busy));
 
-    const status = el("p", { className: "reminder-status", role: "status" }, s.note);
+    const status = el("p", { className: "composer-status", role: "status" }, s.note);
     status.setAttribute("aria-live", "polite");
 
-    const textId = `msg-${uid}`;
-    const textarea = el("textarea", { id: textId, rows: 5, value: s.text, placeholder: "Reminder will appear here. You can edit it." });
-    textarea.dataset.focusKey = `${c.key}:text`;
+    // Message, styled as the WhatsApp bubble it will become
+    const textarea = el("textarea", {
+      id: "message",
+      rows: 6,
+      value: s.text,
+      readOnly: s.busy,
+      placeholder: "Pick a tone and press Write. The draft lands here and you can edit it before sending.",
+    });
 
-    const copy = el("button", { type: "button", className: "btn btn-secondary" }, "Copy");
-    copy.dataset.focusKey = `${c.key}:copy`;
-
+    const copy = el("button", { type: "button", className: "btn btn-secondary" }, "Copy message");
     const wa = el("a", { className: "btn btn-whatsapp", target: "_blank", rel: "noopener noreferrer" }, "Open in WhatsApp");
     const upiValid = isValidUpi(settings.upi);
-    const upi = el("a", { className: "btn btn-ghost", href: upiValid ? upiLink(settings.upi, shop, c.balance) : "" }, "UPI pay link");
-
-    const actions = el("div", { className: "reminder-actions" }, copy, wa);
-    if (upiValid) actions.append(upi);
+    const actions = el("div", { className: "composer-actions" }, copy, wa);
+    if (upiValid) {
+      actions.append(el("a", { className: "btn btn-ghost", href: upiLink(settings.upi, shop, c.balance) }, "UPI pay link"));
+    }
 
     const syncLinks = (): void => {
       const msg = textarea.value.trim();
       wa.href = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-      actions.hidden = !msg;
+      const off = !msg || s.busy;
+      copy.disabled = off;
+      wa.toggleAttribute("aria-disabled", off);
+      wa.tabIndex = off ? -1 : 0;
     };
     syncLinks();
+    wa.addEventListener("click", (e) => {
+      if (wa.hasAttribute("aria-disabled")) e.preventDefault();
+    });
 
     textarea.addEventListener("input", () => {
       s.text = textarea.value;
@@ -143,54 +240,52 @@ export class RemindersView {
 
     copy.addEventListener("click", async () => {
       const ok = await copyText(textarea.value.trim());
-      s.note = ok ? "Copied" : "Couldn't copy. Select the text and copy it by hand.";
+      s.note = ok ? "Copied. Paste it in WhatsApp or SMS." : "Couldn't copy. Select the text and copy it by hand.";
       status.textContent = s.note;
+      if (ok) {
+        copy.textContent = "Copied";
+        window.setTimeout(() => (copy.textContent = "Copy message"), 1600);
+      }
     });
 
     write.addEventListener("click", async () => {
+      const key = c.key;
       s.busy = true;
-      s.note = "Gemma likh raha hai...";
-      this.render();
+      s.note = "";
+      this.renderComposer();
       try {
         const res = await writeReminder({ name: c.name, amount, shop, tone: s.tone });
         s.text = finalMessage(res.text, this.getSettings());
         s.note = res.fromTemplate
           ? "Gemma's draft missed the name or amount, so a standard message is shown. Edit as you like."
-          : "Done. Read it once, edit if needed, then copy or open WhatsApp.";
+          : "Drafted by Gemma. Read it once, then copy or open WhatsApp.";
       } catch (err) {
         s.note = err instanceof Error ? err.message : "Couldn't write the reminder.";
       } finally {
         s.busy = false;
-        this.render();
+        this.renderList();
+        if (this.selected === key) {
+          this.renderComposer();
+          this.composer.querySelector<HTMLTextAreaElement>("#message")?.focus();
+        }
       }
     });
 
-    textarea.readOnly = s.busy;
-    // The message box appears once there is something to edit.
-    const messageField = el("div", { className: "field" }, el("label", { htmlFor: textId }, `Message for ${c.name}`), textarea);
-    messageField.hidden = !s.text && !s.busy;
-    const li = el(
-      "li",
-      { className: "reminder-card" },
-      el("div", { className: "reminder-head" },
-        el("h3", {}, c.name),
-        el("span", { className: "reminder-amount" }, amount),
-      ),
-      el("div", { className: "reminder-controls" },
-        el("div", { className: "field" }, el("label", { htmlFor: toneId }, "Tone"), tone),
-        write,
-      ),
-      messageField,
+    const bubble = el(
+      "div",
+      { className: "bubble-wrap" },
+      el("label", { htmlFor: "message" }, "Message", el("span", { className: "muted" }, " (edit freely)")),
+      el("div", { className: "bubble" }, textarea),
+    );
+    bubble.dataset.busy = String(s.busy);
+
+    this.composer.replaceChildren(
+      head,
+      el("div", { className: "composer-controls" }, tones, write),
+      bubble,
       actions,
       status,
+      el("p", { className: "composer-foot" }, "Nothing is sent automatically. WhatsApp opens with the text ready; you pick the contact and tap send. UPI links open only on a phone with a UPI app."),
     );
-    li.setAttribute("aria-busy", String(s.busy));
-    return li;
   }
-}
-
-function hash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return h;
 }

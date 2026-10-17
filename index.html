@@ -4,41 +4,72 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Photograph your udhaar khata. Gemma 4 reads it on this laptop and writes polite reminders." />
-    <meta name="theme-color" content="#f7f1e4" />
+    <meta name="theme-color" content="#1f2b5c" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>KhataLens: udhaar khata to ledger, on your laptop</title>
   </head>
   <body>
-    <header class="masthead">
-      <h1>Khata<span>Lens</span></h1>
-      <p id="gemma-status" class="status" role="status" aria-live="polite" data-state="checking">Checking Gemma...</p>
-      <p class="tagline">Photograph a page of your udhaar khata. Gemma 4 reads it on this laptop, totals who owes what, and drafts a polite reminder for each customer.</p>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="/" aria-label="KhataLens home">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <rect x="5" y="4" width="18" height="24" rx="2.5" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M9 10h10M9 14h10M9 18h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".6" />
+            <circle cx="21.5" cy="21.5" r="5" class="brand-lens" stroke-width="2.2" />
+            <path d="m25.2 25.2 3.3 3.3" class="brand-lens" stroke-width="2.4" stroke-linecap="round" />
+          </svg>
+          <span class="brand-name">Khata<em>Lens</em></span>
+        </a>
+        <p class="topbar-claim">Paper udhaar khata in, digital hisaab out</p>
+        <div class="topbar-meta">
+          <span class="chip chip-private" title="The photo and ledger never leave this computer">On-device · no cloud</span>
+          <p id="gemma-status" class="status" role="status" aria-live="polite" data-state="checking">Checking Gemma...</p>
+        </div>
+      </div>
     </header>
 
-    <main id="app">
-      <div id="ollama-help" class="error" role="alert" hidden>
-        <p id="ollama-help-msg">Ollama isn't running.</p>
-        <p class="hint">Open a terminal, run <code id="ollama-help-cmd">ollama serve</code>, then check again. The ledger and saved reminders still work without it.</p>
-        <div><button id="ollama-retry" type="button" class="btn btn-secondary">Check again</button></div>
+    <div id="ollama-help" class="banner" role="alert" hidden>
+      <div class="banner-inner">
+        <p><strong id="ollama-help-msg">Ollama isn't running.</strong> Open a terminal and run <code id="ollama-help-cmd">ollama serve</code>. The ledger still works without it.</p>
+        <button id="ollama-retry" type="button" class="btn btn-secondary btn-sm">Check again</button>
       </div>
+    </div>
 
-      <section class="panel" aria-labelledby="capture-title">
-        <h2 id="capture-title">1. Photograph a khata page</h2>
-        <p class="hint">One page at a time, flat and well lit. The photo stays on this laptop.</p>
+    <main class="workspace">
+      <div class="work-top">
+      <!-- Left: the page itself, pinned while you check the ledger -->
+      <section class="panel page-panel" aria-labelledby="capture-title">
+        <div class="panel-head">
+          <h2 id="capture-title"><span class="step">1</span> Khata page</h2>
+        </div>
+
+        <div id="stage" class="stage" data-state="empty">
+          <div id="stage-empty" class="stage-empty">
+            <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+              <rect x="6" y="12" width="36" height="26" rx="4" fill="none" stroke="currentColor" stroke-width="2.5" />
+              <circle cx="24" cy="25" r="7" fill="none" stroke="currentColor" stroke-width="2.5" />
+              <path d="M17 12l3-5h8l3 5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+            </svg>
+            <p class="stage-title">Drop a photo of one khata page</p>
+            <p class="stage-hint">Flat, well lit, one page. It stays on this laptop.</p>
+          </div>
+          <figure id="preview" class="preview" hidden>
+            <img id="preview-img" alt="The khata page you selected" />
+            <div class="scan" aria-hidden="true"></div>
+          </figure>
+        </div>
+        <p id="preview-meta" class="meta" hidden></p>
+
         <div class="capture-actions">
           <label class="btn btn-secondary file-btn">
             <input id="photo-input" type="file" accept="image/*" capture="environment" class="visually-hidden" />
-            <span>Take or choose photo</span>
+            <span>Choose photo</span>
           </label>
           <button id="sample-btn" type="button" class="btn btn-secondary">Try sample page</button>
         </div>
-        <figure id="preview" class="preview" hidden>
-          <img id="preview-img" alt="The khata page you selected" />
-          <figcaption id="preview-meta"></figcaption>
-        </figure>
-        <button id="read-btn" type="button" class="btn btn-primary" disabled>Read with Gemma</button>
+        <button id="read-btn" type="button" class="btn btn-primary btn-lg" disabled>Read with Gemma</button>
         <p id="read-progress" class="progress" role="status" aria-live="polite" hidden></p>
-        <div id="read-error" class="error" role="alert" hidden>
+        <div id="read-error" class="alert" role="alert" hidden>
           <p id="read-error-msg"></p>
           <details id="read-error-raw-wrap" hidden>
             <summary>Show Gemma's raw answer</summary>
@@ -47,71 +78,79 @@
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="ledger-title">
+      <!-- Right: the ledger Gemma produced -->
+      <section class="panel ledger-panel" aria-labelledby="ledger-title">
         <div class="panel-head">
-          <h2 id="ledger-title">2. Check the ledger</h2>
-          <span id="entry-count" class="muted"></span>
+          <h2 id="ledger-title"><span class="step">2</span> Ledger</h2>
+          <span id="entry-count" class="count">0 entries</span>
+          <div class="panel-tools">
+            <button id="add-row" type="button" class="btn btn-secondary btn-sm">Add row</button>
+            <button id="clear-ledger" type="button" class="btn btn-quiet btn-sm">Clear ledger</button>
+          </div>
         </div>
-        <p class="hint">Gemma can misread handwriting. Compare with the photo and fix anything here; balances update as you type. Udhaar is credit given, jama is payment received.</p>
-        <p id="ledger-empty" class="empty">No entries yet. Read a khata page above, or add a row by hand.</p>
+        <p class="lede">Gemma can misread handwriting. Check each line against the photo and fix it here; the hisaab below updates as you type.</p>
+
+        <div id="ledger-empty" class="ledger-empty">
+          <p class="ledger-empty-title">No entries yet</p>
+          <p>Read a page with Gemma, or add rows by hand. <strong>Udhaar</strong> is credit given, <strong>jama</strong> is payment received.</p>
+        </div>
         <div id="ledger-wrap" class="table-wrap">
           <table class="ledger">
             <caption class="visually-hidden">Khata entries</caption>
             <thead>
               <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Customer</th>
-                <th scope="col">Item</th>
-                <th scope="col">Amount (₹)</th>
-                <th scope="col">Type</th>
-                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                <th scope="col" class="col-date">Date</th>
+                <th scope="col" class="col-customer">Customer</th>
+                <th scope="col" class="col-item">Item</th>
+                <th scope="col" class="col-amount">Amount (₹)</th>
+                <th scope="col" class="col-kind">Type</th>
+                <th scope="col" class="col-actions"><span class="visually-hidden">Actions</span></th>
               </tr>
             </thead>
             <tbody id="ledger-body"></tbody>
           </table>
         </div>
-        <div class="ledger-actions">
-          <button id="add-row" type="button" class="btn btn-secondary">Add row</button>
-          <button id="clear-ledger" type="button" class="btn btn-ghost btn-danger-text">Clear ledger</button>
-        </div>
         <details class="raw">
-          <summary>Gemma's raw reading</summary>
+          <summary>Gemma's raw reading (JSON)</summary>
           <pre id="extract-json">Nothing read yet.</pre>
         </details>
       </section>
+      </div>
 
-      <section class="panel" aria-labelledby="balances-title">
-        <h2 id="balances-title">3. Who owes what</h2>
-        <p id="balances-empty" class="empty">Balances appear here once the ledger has entries.</p>
-        <ol id="balance-cards" class="balance-cards"></ol>
-        <p class="grand-total">
-          <span>Total to collect</span>
-          <strong id="grand-total">₹0</strong>
-        </p>
-      </section>
+      <!-- Bottom: who owes what + reminders -->
+      <section id="hisaab" class="panel hisaab-panel" aria-labelledby="hisaab-title" data-empty="true">
+        <div class="panel-head">
+          <h2 id="hisaab-title"><span class="step">3</span> Hisaab and reminders</h2>
+          <fieldset class="shop-settings">
+            <legend class="visually-hidden">Shop details used in reminders</legend>
+            <div class="field-inline">
+              <label for="shop-name">Shop name</label>
+              <input id="shop-name" type="text" autocomplete="organization" />
+            </div>
+            <div class="field-inline">
+              <label for="upi-id">UPI ID <span class="muted">(optional)</span></label>
+              <input id="upi-id" type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="sharmastore@okaxis" aria-describedby="upi-hint" />
+              <span id="upi-hint" class="visually-hidden">Added to each message as a plain text line.</span>
+            </div>
+          </fieldset>
+        </div>
 
-      <section class="panel" aria-labelledby="reminders-title">
-        <h2 id="reminders-title">4. Send polite reminders</h2>
-        <fieldset class="settings">
-          <legend>Shop details</legend>
-          <div class="field">
-            <label for="shop-name">Shop name</label>
-            <input id="shop-name" type="text" autocomplete="organization" />
+        <div class="hisaab-grid">
+          <div class="debtors">
+            <div class="total">
+              <p class="total-label">Total to collect</p>
+              <p id="grand-total" class="total-amount">₹0</p>
+              <p id="hisaab-summary" class="total-sub">No customers yet</p>
+            </div>
+            <ol id="customer-list" class="cust-list" aria-label="Customers, highest balance first"></ol>
           </div>
-          <div class="field">
-            <label for="upi-id">UPI ID <span class="muted">(optional)</span></label>
-            <input id="upi-id" type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="sharmastore@okaxis" aria-describedby="upi-hint" />
-            <p id="upi-hint" class="hint">Added to each message as plain text. The "UPI pay link" button only opens on a phone with a UPI app.</p>
-          </div>
-        </fieldset>
-        <p class="hint">Nothing is sent automatically. Copy the message, or open WhatsApp, pick the customer and tap send yourself.</p>
-        <p id="reminders-empty" class="empty">Nobody owes anything right now.</p>
-        <ul id="reminder-list" class="reminder-list"></ul>
+          <div id="composer" class="composer" aria-labelledby="composer-title"></div>
+        </div>
       </section>
     </main>
 
     <footer class="foot">
-      <p>Runs on Gemma 4 (gemma4:e2b) through Ollama on this computer. No account, no cloud, no data leaves the laptop.</p>
+      <p>Powered by <strong>Gemma 4</strong> (gemma4:e2b) running in Ollama on this computer. No account, no cloud, no customer data leaves the laptop.</p>
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

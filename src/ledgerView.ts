@@ -1,16 +1,6 @@
-// Ledger UI: editable table + customer balance cards.
+// Ledger UI: the editable table. Balance changes are published to listeners.
 // All user and model text goes in via textContent / value, never innerHTML.
-import {
-  balances,
-  blankEntry,
-  formatINR,
-  fromRaw,
-  load,
-  save,
-  totalOwed,
-  type CustomerBalance,
-  type Entry,
-} from "./ledger.ts";
+import { balances, blankEntry, fromRaw, load, save, type CustomerBalance, type Entry } from "./ledger.ts";
 import type { RawEntry } from "./gemma.ts";
 
 type Listener = (list: CustomerBalance[]) => void;
@@ -33,8 +23,6 @@ export class LedgerView {
     private tbody: HTMLTableSectionElement,
     private tableWrap: HTMLElement,
     private emptyState: HTMLElement,
-    private cards: HTMLElement,
-    private totalEl: HTMLElement,
     private countEl: HTMLElement,
   ) {
     this.renderTable();
@@ -95,7 +83,7 @@ export class LedgerView {
     const empty = this.entries.length === 0;
     this.emptyState.hidden = !empty;
     this.tableWrap.hidden = empty;
-    this.countEl.textContent = empty ? "" : `${this.entries.length} ${this.entries.length === 1 ? "entry" : "entries"}`;
+    this.countEl.textContent = `${this.entries.length} ${this.entries.length === 1 ? "entry" : "entries"}`;
   }
 
   private row(entry: Entry, index: number): HTMLTableRowElement {
@@ -175,28 +163,6 @@ export class LedgerView {
 
   private renderBalances(): void {
     const list = balances(this.entries);
-    this.cards.replaceChildren(
-      ...list.map((c) => {
-        const state = c.balance > 0 ? "owes" : c.balance < 0 ? "advance" : "settled";
-        const note =
-          state === "owes" ? "baaki (owes)" : state === "advance" ? "advance paid" : "hisaab clear";
-        const card = el(
-          "li",
-          { className: "balance-card" },
-          el("span", { className: "balance-name" }, c.name),
-          el("span", { className: "balance-amount" }, formatINR(Math.abs(c.balance))),
-          el("span", { className: "balance-note" }, note),
-          el(
-            "span",
-            { className: "balance-detail" },
-            `Udhaar ${formatINR(c.udhaar)} · Jama ${formatINR(c.jama)}`,
-          ),
-        );
-        card.dataset.state = state;
-        return card;
-      }),
-    );
-    this.totalEl.textContent = formatINR(totalOwed(list));
     for (const fn of this.listeners) fn(list);
   }
 }

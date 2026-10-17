@@ -2,7 +2,7 @@ import "./styles.css";
 import { extractEntries, GemmaParseError, OllamaDownError, warmUp, type GemmaStatus } from "./gemma.ts";
 import { fetchSample, prepareImage, type PreparedImage } from "./image.ts";
 import { LedgerView } from "./ledgerView.ts";
-import { RemindersView } from "./reminders.ts";
+import { HisaabView } from "./reminders.ts";
 import { isValidUpi, loadSettings, saveSettings } from "./settings.ts";
 
 function $<T extends HTMLElement>(id: string): T {
@@ -14,6 +14,8 @@ function $<T extends HTMLElement>(id: string): T {
 const statusEl = $("gemma-status");
 const photoInput = $<HTMLInputElement>("photo-input");
 const sampleBtn = $<HTMLButtonElement>("sample-btn");
+const stage = $("stage");
+const stageEmpty = $("stage-empty");
 const preview = $("preview");
 const previewImg = $<HTMLImageElement>("preview-img");
 const previewMeta = $("preview-meta");
@@ -25,28 +27,30 @@ const errorRawWrap = $("read-error-raw-wrap");
 const errorRaw = $("read-error-raw");
 const extractJson = $("extract-json");
 
+// ---------- Ledger + hisaab ----------
+
 const ledger = new LedgerView(
   $<HTMLTableSectionElement>("ledger-body"),
   $("ledger-wrap"),
   $("ledger-empty"),
-  $("balance-cards"),
-  $("grand-total"),
   $("entry-count"),
 );
 
-// Settings + reminders
 const settings = loadSettings();
 const shopInput = $<HTMLInputElement>("shop-name");
 const upiInput = $<HTMLInputElement>("upi-id");
 shopInput.value = settings.shop;
 upiInput.value = settings.upi;
 
-const reminders = new RemindersView($("reminder-list"), $("reminders-empty"), () => settings);
-const balancesEmpty = $("balances-empty");
-ledger.onBalancesChange((list) => {
-  balancesEmpty.hidden = list.length > 0;
-  reminders.update(list);
-});
+const hisaab = new HisaabView(
+  $("customer-list"),
+  $("grand-total"),
+  $("hisaab-summary"),
+  $("composer"),
+  $("hisaab"),
+  () => settings,
+);
+ledger.onBalancesChange((list) => hisaab.update(list));
 
 function markUpi(): void {
   const v = upiInput.value.trim();
@@ -57,13 +61,13 @@ shopInput.addEventListener("input", () => {
   settings.shop = shopInput.value;
   saveSettings(settings);
 });
-shopInput.addEventListener("change", () => reminders.render());
+shopInput.addEventListener("change", () => hisaab.refresh());
 upiInput.addEventListener("input", () => {
   settings.upi = upiInput.value.trim();
   saveSettings(settings);
   markUpi();
 });
-upiInput.addEventListener("change", () => reminders.render());
+upiInput.addEventListener("change", () => hisaab.refresh());
 
 $("add-row").addEventListener("click", () => ledger.addBlank());
 $("clear-ledger").addEventListener("click", () => {
@@ -71,13 +75,12 @@ $("clear-ledger").addEventListener("click", () => {
   if (window.confirm(`Clear all ${ledger.size} entries? This can't be undone.`)) ledger.clear();
 });
 
-let current: PreparedImage | null = null;
-let previewUrl: string | null = null;
+// ---------- Gemma status ----------
 
 const STATUS_TEXT: Record<GemmaStatus, string> = {
   checking: "Checking Gemma...",
   loading: "Gemma loading...",
-  ready: "Gemma ready",
+  ready: "Gemma 4 ready",
   down: "Ollama not running: run ollama serve",
   "no-model": "Gemma not installed",
 };
@@ -90,8 +93,7 @@ const retryBtn = $<HTMLButtonElement>("ollama-retry");
 function setStatus(s: GemmaStatus): void {
   statusEl.textContent = STATUS_TEXT[s];
   statusEl.dataset.state = s;
-  const problem = s === "down" || s === "no-model";
-  ollamaHelp.hidden = !problem;
+  ollamaHelp.hidden = !(s === "down" || s === "no-model");
   retryBtn.disabled = s === "checking" || s === "loading";
   if (s === "down") {
     ollamaHelpMsg.textContent = "Ollama isn't running, so Gemma can't read photos or write reminders yet.";
@@ -104,6 +106,11 @@ function setStatus(s: GemmaStatus): void {
 
 retryBtn.addEventListener("click", () => void warmUp(setStatus));
 
+// ---------- Photo ----------
+
+let current: PreparedImage | null = null;
+let previewUrl: string | null = null;
+
 function showError(message: string, raw?: string): void {
   errorMsg.textContent = message;
   errorRaw.textContent = raw ?? "";
@@ -113,7 +120,12 @@ function showError(message: string, raw?: string): void {
 
 async function loadPhoto(blob: Blob, label: string): Promise<void> {
   errorBox.hidden = true;
+  progress.hidden = true;
   readBtn.disabled = true;
+  if (!blob.type.startsWith("image/")) {
+    showError("That file isn't a photo. Choose a JPG or PNG of the khata page.");
+    return;
+  }
   try {
     current = await prepareImage(blob);
   } catch (err) {
@@ -124,8 +136,11 @@ async function loadPhoto(blob: Blob, label: string): Promise<void> {
   if (previewUrl) URL.revokeObjectURL(previewUrl);
   previewUrl = URL.createObjectURL(blob);
   previewImg.src = previewUrl;
-  previewMeta.textContent = `${label}: resized to ${current.width} × ${current.height} px (${Math.round(current.bytes / 1024)} KB) for Gemma`;
+  previewMeta.textContent = `${label} · sent to Gemma as ${current.width} × ${current.height} px, ${Math.round(current.bytes / 1024)} KB`;
+  previewMeta.hidden = false;
   preview.hidden = false;
+  stageEmpty.hidden = true;
+  stage.dataset.state = "loaded";
   readBtn.disabled = false;
 }
 
@@ -142,23 +157,43 @@ sampleBtn.addEventListener("click", async () => {
   }
 });
 
+// Drag and drop onto the stage
+stage.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  stage.dataset.drag = "true";
+});
+stage.addEventListener("dragleave", () => delete stage.dataset.drag);
+stage.addEventListener("drop", (e) => {
+  e.preventDefault();
+  delete stage.dataset.drag;
+  const file = e.dataTransfer?.files?.[0];
+  if (file) void loadPhoto(file, file.name);
+});
+
+// ---------- Read with Gemma ----------
+
 readBtn.addEventListener("click", async () => {
   if (!current) return;
   errorBox.hidden = true;
   readBtn.disabled = true;
-  readBtn.textContent = "Reading...";
+  readBtn.textContent = "Gemma padh raha hai...";
+  readBtn.setAttribute("aria-busy", "true");
+  stage.dataset.reading = "true";
   progress.hidden = false;
-  progress.dataset.busy = "true";
-  progress.textContent = "Gemma padh raha hai... (the first read can take up to a minute)";
+  progress.dataset.tone = "busy";
+  progress.textContent = "Reading the page on this laptop. The first read can take up to a minute.";
   const started = performance.now();
   try {
     const result = await extractEntries(current.base64);
     const secs = ((performance.now() - started) / 1000).toFixed(1);
     extractJson.textContent = JSON.stringify(result, null, 2);
     ledger.addFromGemma(result.entries);
-    const skipped = result.unreadable_lines > 0 ? ` ${result.unreadable_lines} line(s) were unreadable; add them by hand.` : "";
-    progress.textContent = `Read ${result.entries.length} entries in ${secs} s and added them to the ledger.${skipped}`;
+    const skipped =
+      result.unreadable_lines > 0 ? ` ${result.unreadable_lines} line(s) were unreadable; add them by hand.` : "";
+    progress.dataset.tone = "done";
+    progress.textContent = `Read ${result.entries.length} entries in ${secs} s. Check them in the ledger.${skipped}`;
     if (result.entries.length === 0) {
+      progress.hidden = true;
       showError("Gemma couldn't find any entries. Try a sharper, well-lit photo of one page.");
     }
   } catch (err) {
@@ -174,7 +209,8 @@ readBtn.addEventListener("click", async () => {
   } finally {
     readBtn.disabled = false;
     readBtn.textContent = "Read with Gemma";
-    delete progress.dataset.busy;
+    readBtn.removeAttribute("aria-busy");
+    delete stage.dataset.reading;
   }
 });
 
