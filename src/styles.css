@@ -756,12 +756,18 @@ details summary {
 }
 
 .ledger .col-amount {
-  width: 9rem;
+  width: 8.5rem;
 }
 
-.ledger .col-kind,
-.ledger .col-actions {
+.ledger .col-kind {
   width: 1%;
+  white-space: nowrap;
+}
+
+/* Reserved width, so the "Corrected" tag appearing never shifts the columns */
+.ledger .col-actions {
+  width: 8.5rem;
+  min-width: 8.5rem;
   white-space: nowrap;
 }
 
@@ -849,7 +855,10 @@ tr[data-kind="jama"] .col-item input::placeholder {
 
 .row-delete {
   min-height: 36px;
-  padding: 0 0.625rem;
+  min-width: 36px;
+  padding: 0;
+  font-size: 1rem !important;
+  vertical-align: middle;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -945,6 +954,8 @@ tr[data-kind="jama"] .col-item input::placeholder {
 }
 
 .total-amount {
+  justify-self: start;
+  transform-origin: left center;
   font: 700 2.5rem/1.1 var(--serif);
   letter-spacing: -0.01em;
   color: oklch(0.86 0.09 40);
@@ -1290,6 +1301,141 @@ tr[data-kind="jama"] .col-item input::placeholder {
   border-top: 1px solid var(--rule);
 }
 
+/* ================= Feedback details ================= */
+
+/* Gemma's rows arrive one after another */
+.ledger tbody tr[data-fresh="true"] {
+  animation: row-in 360ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* "Corrected" tag on Gemma rows the shopkeeper fixed */
+.col-actions {
+  text-align: right;
+}
+
+.tag-edited {
+  display: none;
+  margin-right: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--primary);
+  background: var(--primary-tint);
+  border: 1px solid oklch(0.38 0.14 264 / 0.3);
+  vertical-align: middle;
+}
+
+.ledger tr[data-edited="true"] .tag-edited {
+  display: inline-block;
+}
+
+/* Udhaar - Jama = Baaki under the table */
+.ledger-sum {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1rem;
+  color: var(--ink-3);
+  padding: 0.25rem 0.25rem 0;
+}
+
+.sum-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.sum-owed strong {
+  color: var(--owed);
+}
+
+.sum-jama strong {
+  color: var(--jama);
+}
+
+.sum-net {
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--owed-tint);
+}
+
+.sum-net strong {
+  color: var(--owed);
+  font-size: 1.125rem;
+}
+
+/* Share of the total, per customer */
+.cust {
+  grid-template-areas:
+    "name amount"
+    "detail note"
+    "bar bar";
+}
+
+.cust-bar {
+  grid-area: bar;
+  height: 4px;
+  margin-top: 0.5rem;
+  border-radius: 2px;
+  background: oklch(0.86 0.04 238 / 0.6);
+  overflow: hidden;
+  position: relative;
+}
+
+.cust-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--owed);
+  transform-origin: left center;
+  transform: scaleX(var(--share, 0));
+  transition: transform 300ms var(--ease-out);
+}
+
+/* A value that just changed glows once */
+.bump {
+  animation: bump 700ms var(--ease-out);
+  border-radius: 6px;
+}
+
+@keyframes bump {
+  0% {
+    background-color: oklch(0.88 0.12 85);
+    box-shadow: 0 0 0 4px oklch(0.88 0.12 85);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+.total-amount.bump {
+  animation-name: bump-dark;
+}
+
+@keyframes bump-dark {
+  0% {
+    text-shadow: 0 0 18px oklch(0.86 0.09 40 / 0.9);
+    transform: scale(1.04);
+  }
+  100% {
+    text-shadow: none;
+    transform: none;
+  }
+}
+
 /* ================= Footer ================= */
 
 .foot {
@@ -1310,6 +1456,12 @@ tr[data-kind="jama"] .col-item input::placeholder {
   .btn:active:not(:disabled),
   .kind-toggle:active,
   .cust:active {
+    transform: none;
+  }
+  .ledger tbody tr[data-fresh="true"] {
+    animation: none;
+  }
+  .total-amount.bump {
     transform: none;
   }
   .stage[data-reading="true"] .scan::before {

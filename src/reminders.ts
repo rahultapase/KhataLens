@@ -59,6 +59,15 @@ async function copyText(text: string): Promise<boolean> {
   return ok;
 }
 
+/** Brief highlight on a value that just changed (CSS handles reduced motion). */
+function bump(node: Element | null): void {
+  if (!(node instanceof HTMLElement)) return;
+  node.classList.remove("bump");
+  void node.offsetWidth; // restart the animation
+  node.classList.add("bump");
+  node.addEventListener("animationend", () => node.classList.remove("bump"), { once: true });
+}
+
 function stateOf(c: CustomerBalance): "owes" | "advance" | "settled" {
   return c.balance > 0 ? "owes" : c.balance < 0 ? "advance" : "settled";
 }
@@ -77,7 +86,22 @@ export class HisaabView {
     private getSettings: () => Settings,
   ) {}
 
+  /** Last seen balances, to highlight values that just changed. */
+  private prev = new Map<string, number>();
+  private prevTotal: number | null = null;
+  private changed = new Set<string>();
+
   update(customers: CustomerBalance[]): void {
+    this.changed.clear();
+    if (this.prev.size > 0) {
+      for (const c of customers) {
+        if (this.prev.has(c.key) && this.prev.get(c.key) !== c.balance) this.changed.add(c.key);
+      }
+    }
+    this.prev = new Map(customers.map((c) => [c.key, c.balance]));
+    const total = totalOwed(customers);
+    if (this.prevTotal !== null && this.prevTotal !== total && customers.length > 0) bump(this.totalEl);
+    this.prevTotal = total;
     this.customers = customers;
     const owing = customers.filter((c) => c.balance > 0);
     if (!this.selected || !customers.some((c) => c.key === this.selected)) {
@@ -115,6 +139,7 @@ export class HisaabView {
   }
 
   private renderList(): void {
+    const total = totalOwed(this.customers);
     const items = this.customers.map((c) => {
       const st = stateOf(c);
       const s = this.state.get(c.key);
@@ -134,8 +159,15 @@ export class HisaabView {
           s?.text ? "Reminder drafted" : st === "owes" ? "baaki" : st === "advance" ? "advance paid" : "hisaab clear",
         ),
       );
+      // Share of everything still to collect
+      const share = total > 0 && c.balance > 0 ? c.balance / total : 0;
+      const bar = el("span", { className: "cust-bar" });
+      bar.style.setProperty("--share", share.toFixed(4));
+      bar.setAttribute("aria-hidden", "true");
+      btn.append(bar);
       btn.dataset.key = c.key;
       btn.dataset.state = st;
+      if (this.changed.has(c.key)) bump(btn.querySelector(".cust-amount"));
       if (s?.text) btn.dataset.drafted = "true";
       if (c.key === this.selected) btn.setAttribute("aria-current", "true");
       btn.addEventListener("click", () => this.select(c.key));

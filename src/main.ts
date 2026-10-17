@@ -1,6 +1,7 @@
 import "./styles.css";
 import { extractEntries, GemmaParseError, OllamaDownError, warmUp, type GemmaStatus } from "./gemma.ts";
 import { fetchSample, prepareImage, type PreparedImage } from "./image.ts";
+import { formatINR } from "./ledger.ts";
 import { LedgerView } from "./ledgerView.ts";
 import { HisaabView } from "./reminders.ts";
 import { isValidUpi, loadSettings, saveSettings } from "./settings.ts";
@@ -50,7 +51,33 @@ const hisaab = new HisaabView(
   $("hisaab"),
   () => settings,
 );
-ledger.onBalancesChange((list) => hisaab.update(list));
+const ledgerSum = $("ledger-sum");
+ledger.onBalancesChange((list) => {
+  hisaab.update(list);
+  // One-line arithmetic under the table: udhaar - jama = baaki
+  const udhaar = list.reduce((s, c) => s + c.udhaar, 0);
+  const jama = list.reduce((s, c) => s + c.jama, 0);
+  ledgerSum.hidden = list.length === 0;
+  ledgerSum.replaceChildren(
+    sumPart("Udhaar", formatINR(udhaar), "owed"),
+    " − ",
+    sumPart("Jama", formatINR(jama), "jama"),
+    " = ",
+    sumPart("Baaki", formatINR(udhaar - jama), "net"),
+  );
+});
+
+function sumPart(label: string, value: string, tone: string): HTMLElement {
+  const span = document.createElement("span");
+  span.className = `sum-part sum-${tone}`;
+  const l = document.createElement("span");
+  l.className = "sum-label";
+  l.textContent = label;
+  const v = document.createElement("strong");
+  v.textContent = value;
+  span.append(l, " ", v);
+  return span;
+}
 
 function markUpi(): void {
   const v = upiInput.value.trim();

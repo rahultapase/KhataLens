@@ -8,6 +8,10 @@ export interface Entry {
   date: string;
   amount: number;
   kind: EntryKind;
+  /** Where the row came from; "gemma" rows can be marked as corrected. */
+  source?: "gemma" | "manual";
+  /** True once the shopkeeper changed a Gemma row by hand. */
+  edited?: boolean;
 }
 
 export interface CustomerBalance {
@@ -44,7 +48,7 @@ export function fromRaw(raw: RawEntry): Entry {
 }
 
 export function blankEntry(): Entry {
-  return { id: newId(), customer: "", item: "", date: "", amount: 0, kind: "udhaar" };
+  return { id: newId(), customer: "", item: "", date: "", amount: 0, kind: "udhaar", source: "manual" };
 }
 
 export function load(): Entry[] {
@@ -59,7 +63,9 @@ export function load(): Entry[] {
         item: String(e.item ?? ""),
         date: String(e.date ?? ""),
         amount: Number.isFinite(Number(e.amount)) ? Number(e.amount) : 0,
-        kind: e.kind === "jama" ? "jama" : "udhaar",
+        kind: e.kind === "jama" ? ("jama" as const) : ("udhaar" as const),
+        source: e.source === "gemma" ? ("gemma" as const) : ("manual" as const),
+        edited: e.edited === true,
       }));
   } catch {
     return [];

@@ -38,9 +38,15 @@ export class LedgerView {
     return this.entries.length;
   }
 
+  /** Rows that just arrived from Gemma; they animate in once. */
+  private fresh = new Set<string>();
+
   addFromGemma(raw: RawEntry[]): void {
-    this.entries.push(...raw.map(fromRaw));
+    const added = raw.map((r) => ({ ...fromRaw(r), source: "gemma" as const }));
+    for (const e of added) this.fresh.add(e.id);
+    this.entries.push(...added);
     this.commit(true);
+    this.fresh.clear();
   }
 
   addBlank(): void {
@@ -65,6 +71,12 @@ export class LedgerView {
     const entry = this.entries.find((e) => e.id === id);
     if (!entry) return;
     Object.assign(entry, patch);
+    // A Gemma row the shopkeeper fixed by hand gets a "Corrected" tag.
+    if (entry.source === "gemma" && !entry.edited) {
+      entry.edited = true;
+      const tr = this.tbody.querySelector<HTMLTableRowElement>(`tr[data-id="${CSS.escape(id)}"]`);
+      if (tr) tr.dataset.edited = "true";
+    }
     this.commit(false);
   }
 
@@ -135,9 +147,11 @@ export class LedgerView {
       this.update(entry.id, { kind: next });
       paintKind(next);
       tr.dataset.kind = next;
+      const item = tr.querySelector<HTMLInputElement>(".col-item input");
+      if (item) item.placeholder = next === "jama" ? "payment received" : "";
     });
 
-    const del = el("button", { type: "button", className: "row-delete btn-icon" }, "Delete");
+    const del = el("button", { type: "button", className: "row-delete", title: "Delete row" }, "✕");
     del.setAttribute("aria-label", `Delete row ${n}`);
     del.addEventListener("click", () => this.remove(entry.id, index));
 
@@ -146,7 +160,7 @@ export class LedgerView {
       {},
       field("date", "Date", { placeholder: "dd/mm", inputMode: "numeric" }),
       field("customer", "Customer", { placeholder: "Name" }),
-      field("item", "Item"),
+      field("item", "Item", { placeholder: entry.kind === "jama" ? "payment received" : "" }),
       el(
         "td",
         { className: "col-amount" },
@@ -154,10 +168,15 @@ export class LedgerView {
         amount,
       ),
       el("td", { className: "col-kind" }, kind),
-      el("td", { className: "col-actions" }, del),
+      el("td", { className: "col-actions" }, el("span", { className: "tag-edited", title: "You corrected Gemma's reading" }, "Corrected"), del),
     );
     tr.dataset.id = entry.id;
     tr.dataset.kind = entry.kind;
+    if (entry.edited) tr.dataset.edited = "true";
+    if (this.fresh.has(entry.id)) {
+      tr.dataset.fresh = "true";
+      tr.style.setProperty("--i", String(index - (this.entries.length - this.fresh.size)));
+    }
     return tr;
   }
 
