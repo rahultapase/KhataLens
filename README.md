@@ -44,7 +44,7 @@ KhataLens uses one local model, `gemma4:e2b` (about 4.6B parameters, Q4_K_M), th
 
 | Job | Input | How |
 |---|---|---|
-| Read the page | Photo, downscaled in the browser to 1280 px JPEG | Vision call with a **JSON schema in `format`** (structured output), `think: false`, temperature 0.1. The system prompt explains khata conventions: a name with an amount is udhaar unless the line says jama / paid / diya / received; read numbers literally; never invent rows; uncertain fields become `null`. |
+| Read the page | Photo, downscaled in the browser to 1280 px JPEG | Vision call with a **JSON schema in `format`** (structured output), `think: false`, temperature 0.1. The system prompt explains khata conventions: a name with an amount is udhaar unless the line says jama / paid / diya / received; read numbers literally; never invent rows; uncertain fields become `null`. The app then applies the khata rule per line in code: a payment word (jama, paid, diya...) means jama, and a real item means udhaar. |
 | Write a reminder | Customer, balance, shop name, tone | Text-only call returning plain Roman-script Hinglish, at most 60 words, no threats or shaming. The app checks the reply contains the name, amount and shop, retries once, and falls back to a fixed template if needed. The UPI line is added by the app, not the model, so it is always exact. |
 
 Reliability details:
