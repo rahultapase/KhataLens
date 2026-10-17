@@ -6,7 +6,7 @@ you can copy or open in WhatsApp. Nothing is sent automatically and nothing leav
 
 Built for **Best Use of Gemma 4** at Hacktoberfest 2026 Mumbai.
 
-![KhataLens: the khata photo next to the ledger Gemma read from it](docs/screenshots/01-workspace.png)
+![KhataLens: three khata pages read into one ledger, each row tagged with its page](docs/screenshots/01-workspace.png)
 
 ## The problem
 
@@ -34,9 +34,11 @@ notebook he already keeps.
 5. **Reminders.** Pick a customer and a tone (polite, friendly, firm but respectful). Gemma writes a
    short, respectful Hinglish message with the name, the ₹ amount, the shop name and, if set, your
    UPI ID. Edit it, then **Copy** or **Open in WhatsApp**; you choose the contact and tap send.
+   If a later page or an edit changes the balance, the draft is marked outdated so an old amount
+   isn't sent by mistake.
 6. **Export.** Download the ledger and per-customer balances as a CSV that opens in Excel.
 
-![Reminder composer with a Gemma-drafted Hinglish message](docs/screenshots/02-reminder.png)
+![Hisaab across three pages and a Gemma-drafted Hinglish reminder](docs/screenshots/02-reminder.png)
 
 ## How Gemma 4 is used
 
@@ -83,6 +85,11 @@ npm run dev
 Open the URL Vite prints (usually http://localhost:5173), press **Try sample page**, then
 **Read with Gemma**.
 
+To try a whole book, use **Choose photos** (or drag onto the photo area) and pick all three
+sample pages in `public/`: `sample-khata.jpg`, `sample-khata-2.jpg`, `sample-khata-3.jpg`.
+Expected result after all three: Ramesh ₹240, Pooja ₹150, Imran ₹110, Arjun ₹40, Kavita and
+Sunita settled, **₹540** to collect (Udhaar ₹1,700 − Jama ₹1,160).
+
 Other scripts: `npm run build` (type-check and production build), `npm run preview`.
 
 The browser talks to Ollama through Vite's dev proxy (`/ollama` → `http://localhost:11434`),
@@ -96,7 +103,9 @@ so there is no CORS setup and no API key.
   are written as text).
 - **Do not expose port 11434** (Ollama) or the dev server to the internet. Both are meant for
   `localhost` only and have no authentication.
-- The sample page uses made-up names.
+- The sample pages use made-up names.
+- To catch a page read twice, the app stores only a SHA-256 fingerprint of each resized photo,
+  never the photo itself.
 
 ## Tech
 
