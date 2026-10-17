@@ -37,6 +37,7 @@ const ledger = new LedgerView(
   $("ledger-wrap"),
   $("ledger-empty"),
   $("entry-count"),
+  $("ledger-pager"),
 );
 
 const settings = loadSettings();

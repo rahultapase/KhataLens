@@ -27,7 +27,8 @@ notebook he already keeps.
 2. **Gemma reads it.** Gemma 4's vision model turns each handwritten line into a structured entry:
    customer, item, date, amount, and whether it's udhaar (credit given) or jama (payment received).
 3. **You check it.** The ledger sits next to the photo. Fix any misread; corrected rows are tagged
-   and balances update as you type.
+   and balances update as you type. Long ledgers show 10 rows at a time with page buttons;
+   totals always cover every row.
 4. **Hisaab.** Customers are grouped by name (trimmed, case-insensitive) and sorted by amount owed.
    Balance = udhaar − jama. The total to collect is always visible.
 5. **Reminders.** Pick a customer and a tone (polite, friendly, firm but respectful). Gemma writes a
@@ -51,9 +52,12 @@ Reliability details:
 
 - The model is warmed up when the app opens, and the status pill shows "Gemma loading" or "Gemma 4 ready".
 - 120 s timeout. Invalid JSON is retried once; after that Gemma's raw answer is shown instead of a blank error.
-- On the sample page, Gemma read all 8 lines correctly (names, amounts, dates, udhaar/jama), in
-  about 6–8 s per page once the model was loaded on our laptop. The first call after starting
-  Ollama takes longer while the model loads.
+- On three real handwritten sample pages (`public/sample-khata*.jpg`, 24 lines), Gemma read every
+  name, amount, date and udhaar/jama correctly, about 6–9 s per page once the model was loaded on
+  our laptop. The first call after starting Ollama takes longer while the model loads.
+- The schema asks Gemma to copy each whole line (`line`) before splitting it. That fixed short
+  lines like "Pooja jama 100" being read as udhaar, because the app can then spot the payment
+  word itself.
 
 ### Why on-device matters here
 

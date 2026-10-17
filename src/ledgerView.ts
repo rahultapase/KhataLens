@@ -5,6 +5,9 @@ import type { RawEntry } from "./gemma.ts";
 
 type Listener = (list: CustomerBalance[]) => void;
 
+/** Rows shown at once; the rest are on the next table pages. */
+const ROWS_PER_PAGE = 10;
+
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   props: Partial<HTMLElementTagNameMap[K]> = {},
@@ -24,6 +27,7 @@ export class LedgerView {
     private tableWrap: HTMLElement,
     private emptyState: HTMLElement,
     private countEl: HTMLElement,
+    private pager: HTMLElement,
   ) {
     this.renderTable();
     this.renderBalances();
@@ -49,6 +53,8 @@ export class LedgerView {
   addFromGemma(raw: RawEntry[], page?: number): void {
     const added = raw.map((r) => ({ ...fromRaw(r), source: "gemma" as const, page }));
     for (const e of added) this.fresh.add(e.id);
+    // Jump to the table page where the new rows start, so they are what you see
+    this.showIndex(this.entries.length);
     this.entries.push(...added);
     this.commit(true);
     this.fresh.clear();
@@ -57,12 +63,14 @@ export class LedgerView {
   addBlank(): void {
     const entry = blankEntry();
     this.entries.push(entry);
+    this.showIndex(this.entries.length - 1);
     this.commit(true);
     this.tbody.querySelector<HTMLInputElement>(`[data-id="${entry.id}"] input`)?.focus();
   }
 
   clear(): void {
     this.entries = [];
+    this.view = 0;
     this.commit(true);
   }
 
@@ -87,16 +95,79 @@ export class LedgerView {
 
   private remove(id: string, rowIndex: number): void {
     this.entries = this.entries.filter((e) => e.id !== id);
+    // Deleting the last row on a table page moves back one page
+    if (rowIndex >= this.entries.length && rowIndex > 0) this.showIndex(this.entries.length - 1);
     this.commit(true);
     // Keep keyboard focus nearby after the row disappears.
     const rows = this.tbody.querySelectorAll<HTMLTableRowElement>("tr");
-    const next = rows[Math.min(rowIndex, rows.length - 1)];
+    const local = rowIndex - this.view * ROWS_PER_PAGE;
+    const next = rows[Math.min(Math.max(0, local), rows.length - 1)];
     (next?.querySelector<HTMLButtonElement>(".row-delete") ?? document.getElementById("add-row"))?.focus();
   }
 
+  // ---------- Table pages (10 rows at a time) ----------
+
+  private view = 0;
+
+  private get viewCount(): number {
+    return Math.max(1, Math.ceil(this.entries.length / ROWS_PER_PAGE));
+  }
+
+  /** Show the table page that contains entry index i. */
+  private showIndex(i: number): void {
+    this.view = Math.floor(Math.max(0, i) / ROWS_PER_PAGE);
+  }
+
+  private goTo(view: number, focusSelector?: string): void {
+    this.view = Math.min(Math.max(0, view), this.viewCount - 1);
+    this.renderTable();
+    if (focusSelector) this.pager.querySelector<HTMLElement>(focusSelector)?.focus();
+  }
+
+  private renderPager(): void {
+    const total = this.entries.length;
+    const count = this.viewCount;
+    this.pager.hidden = total <= ROWS_PER_PAGE;
+    if (this.pager.hidden) {
+      this.pager.replaceChildren();
+      return;
+    }
+    const start = this.view * ROWS_PER_PAGE;
+    const end = Math.min(total, start + ROWS_PER_PAGE);
+
+    const info = el("p", { className: "pager-info" }, `Rows ${start + 1}–${end} of ${total}`);
+    info.setAttribute("aria-live", "polite");
+
+    const prev = el("button", { type: "button", className: "pager-btn pager-prev", disabled: this.view === 0 }, "‹ Prev");
+    prev.setAttribute("aria-label", "Previous rows");
+    prev.addEventListener("click", () => this.goTo(this.view - 1, this.view - 1 === 0 ? ".pager-next" : ".pager-prev"));
+
+    const next = el("button", { type: "button", className: "pager-btn pager-next", disabled: this.view >= count - 1 }, "Next ›");
+    next.setAttribute("aria-label", "Next rows");
+    next.addEventListener("click", () =>
+      this.goTo(this.view + 1, this.view + 1 >= count - 1 ? ".pager-prev" : ".pager-next"),
+    );
+
+    const nums = el("ol", { className: "pager-nums" });
+    for (let i = 0; i < count; i++) {
+      const b = el("button", { type: "button", className: "pager-btn pager-num" }, String(i + 1));
+      b.setAttribute("aria-label", `Rows page ${i + 1} of ${count}`);
+      if (i === this.view) b.setAttribute("aria-current", "page");
+      b.dataset.view = String(i);
+      b.addEventListener("click", () => this.goTo(i, `.pager-num[data-view="${i}"]`));
+      nums.append(el("li", {}, b));
+    }
+
+    this.pager.replaceChildren(info, el("div", { className: "pager-controls" }, prev, nums, next));
+  }
+
   private renderTable(): void {
-    const rows = this.entries.map((entry, i) => this.row(entry, i));
+    this.view = Math.min(this.view, this.viewCount - 1);
+    const start = this.view * ROWS_PER_PAGE;
+    const visible = this.entries.slice(start, start + ROWS_PER_PAGE);
+    const rows = visible.map((entry, i) => this.row(entry, start + i));
     this.tbody.replaceChildren(...rows);
+    this.renderPager();
     // Page tags only matter once rows come from more than one page
     const pages = new Set(this.entries.map((e) => e.page).filter(Boolean));
     this.tableWrap.dataset.multipage = String(pages.size > 1);

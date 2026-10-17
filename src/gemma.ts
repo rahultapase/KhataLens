@@ -40,13 +40,16 @@ const EXTRACTION_SCHEMA = {
       items: {
         type: "object",
         properties: {
+          // Exact transcription first: the model reads the whole line before splitting it,
+          // and the app can check it for payment words itself.
+          line: { type: "string" },
           customer: { type: "string" },
           amount: { type: "number" },
           kind: { type: "string", enum: ["udhaar", "jama"] },
           date: { type: ["string", "null"] },
           item: { type: ["string", "null"] },
         },
-        required: ["customer", "amount", "kind", "date", "item"],
+        required: ["line", "customer", "amount", "kind", "date", "item"],
       },
     },
     unreadable_lines: { type: "integer" },
@@ -62,7 +65,9 @@ Rules:
 - Decide every line on its own, never from the lines around it. A line with goods (atta, dal, doodh, tel, ande, chai...) is always "udhaar".
 - Read numbers literally, exactly as written. Do not add, round or calculate.
 - One entry per written line. Do not invent rows. Skip headings and totals.
-- If the date or item is unclear or missing, set it to null. For jama lines, item is null.
+- "line" is the whole written line copied exactly, word by word, before you split it. Include every word, even short ones like "jama" right after a name.
+- "item" is the words between the name and the amount. On a payment line that is the payment word itself, for example "jama".
+- If the date or item is unclear or missing, set it to null.
 - Count lines you cannot read at all in unreadable_lines.`;
 
 interface ChatMessage {
@@ -121,6 +126,9 @@ async function chat(
 /** An "item" that is really a payment note: jama, paid, diya, received, cash... */
 const PAYMENT_WORDS = /^(jama|jma|paid|pay|payment|diya|diye|di|received|recd|rcvd|wapas|cash|upi|online)\b[\s.:-]*\d*\s*$/i;
 
+/** Payment words as whole words anywhere in a transcribed line. */
+const PAYMENT_IN_LINE = /\b(jama|jma|paid|diya|received|recd|rcvd|wapas)\b/i;
+
 function parseExtraction(raw: string): Extraction {
   let parsed: unknown;
   try {
@@ -140,12 +148,14 @@ function parseExtraction(raw: string): Extraction {
     const amount = typeof r.amount === "number" ? r.amount : Number(r.amount);
     if (!customer || !Number.isFinite(amount)) continue;
     let item = typeof r.item === "string" && r.item.trim() ? r.item.trim() : null;
+    const line = typeof r.line === "string" ? r.line : "";
     let kind: EntryKind = r.kind === "jama" ? "jama" : "udhaar";
-    // Khata rule, applied in code because the model can drift into labelling a
-    // run of lines the same way: a payment word means jama; real goods mean udhaar.
-    if (item && PAYMENT_WORDS.test(item)) {
+    // Khata rule, applied in code because the model's own label can drift:
+    // a payment word in the item or anywhere in the transcribed line means jama;
+    // otherwise a real item of goods means udhaar.
+    if ((item && PAYMENT_WORDS.test(item)) || PAYMENT_IN_LINE.test(line)) {
       kind = "jama";
-      item = null;
+      if (item && PAYMENT_WORDS.test(item)) item = null;
     } else if (item) {
       kind = "udhaar";
     }

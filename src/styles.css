@@ -1484,6 +1484,77 @@ tr[data-kind="jama"] .col-item input::placeholder {
   display: inline-block;
 }
 
+/* Ledger table pages */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.pager-info {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.pager-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.pager-nums {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.pager-btn {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--primary);
+  font: 600 0.875rem/1 var(--font);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 160ms var(--ease-out);
+}
+
+.pager-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pager-num {
+  padding: 0;
+}
+
+.pager-num[aria-current="page"] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pager-btn:not(:disabled, [aria-current="page"]):hover {
+    background: var(--primary-tint);
+    border-color: var(--primary);
+  }
+}
+
 /* Udhaar - Jama = Baaki under the table */
 .ledger-sum {
   display: flex;
