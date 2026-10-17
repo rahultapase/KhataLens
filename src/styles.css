@@ -1,3 +1,105 @@
+/* KhataLens: a warm paper ledger. Cream page, ink-blue writing, red for baaki, green for jama.
+   All colours are OKLCH tokens. Contrast figures are against --bg. */
+:root {
+  color-scheme: light;
+
+  /* Paper */
+  --bg: oklch(0.965 0.022 85);
+  --surface: oklch(0.985 0.012 85);
+  --surface-sunk: oklch(0.935 0.028 85);
+  --rule: oklch(0.83 0.045 235); /* notebook ruling */
+  --rule-strong: oklch(0.62 0.07 250);
+
+  /* Ink */
+  --ink: oklch(0.29 0.085 262); /* ~12:1 */
+  --ink-muted: oklch(0.44 0.06 262); /* ~6.8:1 */
+  --primary: oklch(0.4 0.145 262); /* ~8:1, buttons */
+  --primary-hover: oklch(0.34 0.135 262);
+  --on-primary: oklch(0.985 0.012 85);
+  --focus: oklch(0.56 0.2 262); /* ring, >3:1 */
+
+  /* Money */
+  --owed: oklch(0.5 0.185 27); /* ~5.5:1 */
+  --owed-tint: oklch(0.93 0.045 27);
+  --jama: oklch(0.46 0.115 150); /* ~6.3:1 */
+  --jama-tint: oklch(0.93 0.05 150);
+  --warn: oklch(0.52 0.12 70);
+  --warn-tint: oklch(0.93 0.06 85);
+
+  /* Shape and rhythm */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --tap: 44px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --shadow: 0 1px 0 oklch(0.29 0.085 262 / 0.06), 0 6px 20px -12px oklch(0.29 0.085 262 / 0.25);
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* z-index scale */
+  --z-sticky: 10;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 1rem/1.5 var(--font);
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  text-wrap: balance;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+
+p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--surface-sunk);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -10,13 +112,529 @@
   border: 0;
 }
 
-[hidden] {
-  display: none !important;
+.muted {
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.hint {
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
+  max-width: 65ch;
+}
+
+/* ---------- Layout ---------- */
+
+.masthead,
+main {
+  width: min(100% - 2 * var(--space-4), 60rem);
+  margin-inline: auto;
+}
+
+.masthead {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-block: var(--space-5) var(--space-4);
+}
+
+.masthead h1 {
+  font-size: 1.75rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.masthead h1 span {
+  color: var(--owed);
+}
+
+.tagline {
+  grid-column: 1 / -1;
+  color: var(--ink-muted);
+  max-width: 60ch;
+}
+
+main {
+  display: grid;
+  gap: var(--space-4);
+  padding-bottom: var(--space-7);
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: var(--space-5);
+    gap: var(--space-4);
+  }
+  .masthead h1 {
+    font-size: 2rem;
+  }
+}
+
+/* ---------- Status pill ---------- */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  font-size: 0.875rem;
+  font-weight: 550;
+  justify-self: end;
+}
+
+.status::before {
+  content: "";
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--ink-muted);
+  flex: none;
+}
+
+.status[data-state="ready"] {
+  color: var(--jama);
+  border-color: color-mix(in oklch, var(--jama) 40%, transparent);
+  background: var(--jama-tint);
+}
+.status[data-state="ready"]::before {
+  background: var(--jama);
+}
+
+.status[data-state="loading"],
+.status[data-state="checking"] {
+  color: var(--ink);
+  background: var(--warn-tint);
+  border-color: color-mix(in oklch, var(--warn) 40%, transparent);
+}
+.status[data-state="loading"]::before,
+.status[data-state="checking"]::before {
+  background: var(--warn);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.status[data-state="down"],
+.status[data-state="no-model"] {
+  color: var(--owed);
+  background: var(--owed-tint);
+  border-color: color-mix(in oklch, var(--owed) 40%, transparent);
+}
+.status[data-state="down"]::before,
+.status[data-state="no-model"]::before {
+  background: var(--owed);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font: 600 1rem/1.2 var(--font);
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--primary);
+  border-color: var(--rule-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.btn-whatsapp {
+  background: var(--jama-tint);
+  color: var(--jama);
+  border-color: color-mix(in oklch, var(--jama) 45%, transparent);
+}
+
+.btn-danger-text {
+  color: var(--owed);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--surface-sunk);
+  }
+  .btn-ghost:hover {
+    color: var(--primary-hover);
+  }
+  .btn-whatsapp:hover {
+    background: color-mix(in oklch, var(--jama-tint) 70%, var(--jama) 12%);
+  }
+}
+
+/* One focus treatment everywhere. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.file-btn:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------- Forms ---------- */
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.field > label,
+legend {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+  font: inherit;
+  font-size: 1rem; /* 16px stops iOS zoom */
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  min-height: var(--tap);
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-offset: 0;
+  border-color: var(--focus);
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--owed);
+  background: var(--owed-tint);
+}
+
+.settings {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  margin: 0;
+  display: grid;
+  gap: var(--space-3);
+  background: var(--bg);
+}
+
+.settings legend {
+  padding-inline: var(--space-1);
+}
+
+@media (min-width: 640px) {
+  .settings {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+  .settings legend {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------- Capture ---------- */
+
+.capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.capture-actions .btn {
+  flex: 1 1 12rem;
+}
+
+.preview {
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
 }
 
 .preview img {
+  display: block;
   max-width: 100%;
-  max-height: 320px;
+  max-height: 300px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: var(--surface-sunk);
+  transition: opacity 200ms ease;
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+.preview figcaption {
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+#read-btn {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  #read-btn {
+    width: auto;
+    justify-self: start;
+    min-width: 14rem;
+  }
+}
+
+.progress {
+  display: grid;
+  gap: var(--space-2);
+  font-weight: 550;
+}
+
+.progress[data-busy="true"]::after {
+  content: "";
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--rule) 0 30%, var(--primary) 30% 55%, var(--rule) 55%) 0 0 / 200% 100%;
+  animation: reading 1.4s linear infinite;
+}
+
+@keyframes reading {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.error {
+  border: 1px solid color-mix(in oklch, var(--owed) 45%, transparent);
+  background: var(--owed-tint);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.error p {
+  font-weight: 550;
+}
+
+.error pre,
+.raw pre {
+  margin: 0;
+  max-height: 16rem;
+  overflow: auto;
+  font: 0.8125rem/1.45 var(--mono);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+details summary {
+  cursor: pointer;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  color: var(--primary);
+  font-weight: 550;
+}
+
+.empty {
+  color: var(--ink-muted);
+  padding: var(--space-4);
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+/* ---------- Ledger table ---------- */
+
+.table-wrap {
+  min-width: 0;
+}
+
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ledger th {
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: var(--ink-muted);
+  /* cell padding + input padding + input border, so headings line up with the text */
+  padding: 0 calc(var(--space-4) + 1px) var(--space-2);
+  border-bottom: 2px solid var(--rule-strong);
+}
+
+.ledger th:nth-child(4) {
+  text-align: right;
+}
+
+.ledger td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+
+.ledger input {
+  border-color: transparent;
+  background: transparent;
+  padding-inline: var(--space-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ledger input:hover {
+    border-color: var(--rule);
+  }
+}
+
+.ledger input:focus-visible {
+  background: var(--surface);
+  border-color: var(--focus);
+}
+
+.col-amount input {
+  text-align: right;
+  font-weight: 650;
+}
+
+tr[data-kind="udhaar"] .col-amount input {
+  color: var(--owed);
+}
+
+tr[data-kind="jama"] .col-amount input {
+  color: var(--jama);
+}
+
+.kind-toggle {
+  min-height: var(--tap);
+  min-width: 6rem;
+  padding: 0 var(--space-3);
+  border-radius: 999px;
+  font: 650 0.9375rem/1 var(--font);
+  cursor: pointer;
+  border: 1px solid currentColor;
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.kind-toggle:active {
+  transform: scale(0.97);
+}
+
+.kind-toggle[data-kind="udhaar"] {
+  color: var(--owed);
+  background: var(--owed-tint);
+}
+
+.kind-toggle[data-kind="jama"] {
+  color: var(--jama);
+  background: var(--jama-tint);
+}
+
+.row-delete {
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  font: 550 0.875rem/1 var(--font);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .row-delete:hover {
+    color: var(--owed);
+    border-color: color-mix(in oklch, var(--owed) 35%, transparent);
+    background: var(--owed-tint);
+  }
 }
 
 .cell-label {
@@ -26,4 +644,282 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Below 640px each entry becomes a stacked ledger line with visible labels. */
+@media (max-width: 639.98px) {
+  .ledger thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .ledger,
+  .ledger tbody {
+    display: block;
+  }
+  .ledger tr {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr 6.5rem;
+    grid-template-areas:
+      "date customer customer"
+      "item item amount"
+      "kind . actions";
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .ledger td {
+    display: grid;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .col-date {
+    grid-area: date;
+  }
+  .col-customer {
+    grid-area: customer;
+  }
+  .col-item {
+    grid-area: item;
+  }
+  .col-amount {
+    grid-area: amount;
+  }
+  .col-kind {
+    grid-area: kind;
+  }
+  .col-actions {
+    grid-area: actions;
+    justify-items: end;
+    align-self: end;
+  }
+  .cell-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+  .cell-label .visually-hidden {
+    position: absolute;
+  }
+  .ledger input {
+    border-color: var(--rule-strong);
+    background: var(--surface);
+  }
+  .col-amount input {
+    text-align: left;
+  }
+}
+
+@media (min-width: 640px) {
+  .col-date {
+    width: 6.5rem;
+  }
+  .col-amount {
+    width: 8rem;
+  }
+  .col-kind,
+  .col-actions {
+    width: 1%;
+    white-space: nowrap;
+  }
+}
+
+.ledger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* ---------- Balances: a ruled ledger, not a card grid ---------- */
+
+.balance-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.balance-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "name amount"
+    "detail note";
+  gap: 2px var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: baseline;
+}
+
+.balance-name {
+  grid-area: name;
+  font-weight: 650;
+  font-size: 1.0625rem;
+  overflow-wrap: anywhere;
+}
+
+.balance-amount {
+  grid-area: amount;
+  font-weight: 750;
+  font-size: 1.25rem;
+  text-align: right;
+}
+
+.balance-note {
+  grid-area: note;
+  text-align: right;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.balance-detail {
+  grid-area: detail;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.balance-card[data-state="owes"] :is(.balance-amount, .balance-note) {
+  color: var(--owed);
+}
+
+.balance-card[data-state="advance"] :is(.balance-amount, .balance-note) {
+  color: var(--jama);
+}
+
+.balance-card[data-state="settled"] :is(.balance-amount, .balance-note) {
+  color: var(--ink-muted);
+}
+
+.grand-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 4px double var(--ink);
+  font-weight: 650;
+  font-size: 1.0625rem;
+}
+
+.grand-total strong {
+  font-size: 1.625rem;
+  font-weight: 800;
+  color: var(--owed);
+}
+
+/* ---------- Reminders ---------- */
+
+.reminder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.reminder-card {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.reminder-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.reminder-amount {
+  font-weight: 750;
+  font-size: 1.125rem;
+  color: var(--owed);
+}
+
+.reminder-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.reminder-controls .field {
+  flex: 1 1 12rem;
+}
+
+.reminder-controls .btn {
+  flex: 1 1 10rem;
+}
+
+.reminder-card textarea {
+  transition: opacity 200ms ease;
+}
+
+.reminder-card[aria-busy="true"] textarea {
+  opacity: 0.55;
+}
+
+.reminder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.reminder-actions .btn {
+  flex: 1 1 9rem;
+}
+
+.reminder-actions .btn-ghost {
+  flex: 0 1 auto;
+}
+
+.reminder-status {
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+  min-height: 1.3em;
+}
+
+.reminder-status:empty {
+  display: none;
+}
+
+/* ---------- Footer ---------- */
+
+.foot {
+  width: min(100% - 2 * var(--space-4), 60rem);
+  margin: 0 auto;
+  padding: 0 0 var(--space-6);
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+/* ---------- Reduced motion: keep fades, drop movement and loops ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .btn:active:not(:disabled),
+  .kind-toggle:active {
+    transform: none;
+  }
+  .progress[data-busy="true"]::after {
+    background: var(--primary);
+    opacity: 0.6;
+  }
 }

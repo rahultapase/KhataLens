@@ -165,6 +165,10 @@ export class RemindersView {
       }
     });
 
+    textarea.readOnly = s.busy;
+    // The message box appears once there is something to edit.
+    const messageField = el("div", { className: "field" }, el("label", { htmlFor: textId }, `Message for ${c.name}`), textarea);
+    messageField.hidden = !s.text && !s.busy;
     const li = el(
       "li",
       { className: "reminder-card" },
@@ -176,10 +180,11 @@ export class RemindersView {
         el("div", { className: "field" }, el("label", { htmlFor: toneId }, "Tone"), tone),
         write,
       ),
-      el("div", { className: "field" }, el("label", { htmlFor: textId }, `Message for ${c.name}`), textarea),
+      messageField,
       actions,
       status,
     );
+    li.setAttribute("aria-busy", String(s.busy));
     return li;
   }
 }

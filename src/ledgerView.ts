@@ -111,7 +111,7 @@ export class LedgerView {
       return el(
         "td",
         { className: `col-${key}` },
-        el("label", { htmlFor: id, className: "cell-label" }, `${label}, row ${n}`),
+        el("label", { htmlFor: id, className: "cell-label" }, label, el("span", { className: "visually-hidden" }, `, row ${n}`)),
         input,
       );
     };
@@ -158,11 +158,11 @@ export class LedgerView {
       {},
       field("date", "Date", { placeholder: "dd/mm", inputMode: "numeric" }),
       field("customer", "Customer", { placeholder: "Name" }),
-      field("item", "Item", { placeholder: "Item" }),
+      field("item", "Item"),
       el(
         "td",
         { className: "col-amount" },
-        el("label", { htmlFor: amountId, className: "cell-label" }, `Amount in rupees, row ${n}`),
+        el("label", { htmlFor: amountId, className: "cell-label" }, "Amount (₹)", el("span", { className: "visually-hidden" }, `, row ${n}`)),
         amount,
       ),
       el("td", { className: "col-kind" }, kind),

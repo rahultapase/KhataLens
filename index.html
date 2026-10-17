@@ -4,18 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Photograph your udhaar khata. Gemma 4 reads it on this laptop and writes polite reminders." />
-    <title>KhataLens</title>
+    <meta name="theme-color" content="#f7f1e4" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>KhataLens: udhaar khata to ledger, on your laptop</title>
   </head>
   <body>
     <header class="masthead">
-      <h1>KhataLens</h1>
-      <p class="tagline">Photo of your udhaar khata in, ledger and polite reminders out. All on this laptop.</p>
-      <p id="gemma-status" class="status" role="status" aria-live="polite">Checking Gemma...</p>
+      <h1>Khata<span>Lens</span></h1>
+      <p id="gemma-status" class="status" role="status" aria-live="polite" data-state="checking">Checking Gemma...</p>
+      <p class="tagline">Photograph a page of your udhaar khata. Gemma 4 reads it on this laptop, totals who owes what, and drafts a polite reminder for each customer.</p>
     </header>
 
     <main id="app">
+      <div id="ollama-help" class="error" role="alert" hidden>
+        <p id="ollama-help-msg">Ollama isn't running.</p>
+        <p class="hint">Open a terminal, run <code id="ollama-help-cmd">ollama serve</code>, then check again. The ledger and saved reminders still work without it.</p>
+        <div><button id="ollama-retry" type="button" class="btn btn-secondary">Check again</button></div>
+      </div>
+
       <section class="panel" aria-labelledby="capture-title">
         <h2 id="capture-title">1. Photograph a khata page</h2>
+        <p class="hint">One page at a time, flat and well lit. The photo stays on this laptop.</p>
         <div class="capture-actions">
           <label class="btn btn-secondary file-btn">
             <input id="photo-input" type="file" accept="image/*" capture="environment" class="visually-hidden" />
@@ -24,7 +33,7 @@
           <button id="sample-btn" type="button" class="btn btn-secondary">Try sample page</button>
         </div>
         <figure id="preview" class="preview" hidden>
-          <img id="preview-img" alt="Selected khata page" />
+          <img id="preview-img" alt="The khata page you selected" />
           <figcaption id="preview-meta"></figcaption>
         </figure>
         <button id="read-btn" type="button" class="btn btn-primary" disabled>Read with Gemma</button>
@@ -43,8 +52,8 @@
           <h2 id="ledger-title">2. Check the ledger</h2>
           <span id="entry-count" class="muted"></span>
         </div>
-        <p class="hint">Gemma can misread handwriting. Fix anything here; balances update as you type.</p>
-        <p id="ledger-empty" class="empty">No entries yet. Read a khata page, or add a row by hand.</p>
+        <p class="hint">Gemma can misread handwriting. Compare with the photo and fix anything here; balances update as you type. Udhaar is credit given, jama is payment received.</p>
+        <p id="ledger-empty" class="empty">No entries yet. Read a khata page above, or add a row by hand.</p>
         <div id="ledger-wrap" class="table-wrap">
           <table class="ledger">
             <caption class="visually-hidden">Khata entries</caption>
@@ -63,7 +72,7 @@
         </div>
         <div class="ledger-actions">
           <button id="add-row" type="button" class="btn btn-secondary">Add row</button>
-          <button id="clear-ledger" type="button" class="btn btn-ghost">Clear ledger</button>
+          <button id="clear-ledger" type="button" class="btn btn-ghost btn-danger-text">Clear ledger</button>
         </div>
         <details class="raw">
           <summary>Gemma's raw reading</summary>
@@ -73,6 +82,7 @@
 
       <section class="panel" aria-labelledby="balances-title">
         <h2 id="balances-title">3. Who owes what</h2>
+        <p id="balances-empty" class="empty">Balances appear here once the ledger has entries.</p>
         <ol id="balance-cards" class="balance-cards"></ol>
         <p class="grand-total">
           <span>Total to collect</span>
@@ -99,6 +109,10 @@
         <ul id="reminder-list" class="reminder-list"></ul>
       </section>
     </main>
+
+    <footer class="foot">
+      <p>Runs on Gemma 4 (gemma4:e2b) through Ollama on this computer. No account, no cloud, no data leaves the laptop.</p>
+    </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

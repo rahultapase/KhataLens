@@ -1,5 +1,5 @@
 import "./styles.css";
-import { extractEntries, GemmaParseError, warmUp, type GemmaStatus } from "./gemma.ts";
+import { extractEntries, GemmaParseError, OllamaDownError, warmUp, type GemmaStatus } from "./gemma.ts";
 import { fetchSample, prepareImage, type PreparedImage } from "./image.ts";
 import { LedgerView } from "./ledgerView.ts";
 import { RemindersView } from "./reminders.ts";
@@ -42,7 +42,11 @@ shopInput.value = settings.shop;
 upiInput.value = settings.upi;
 
 const reminders = new RemindersView($("reminder-list"), $("reminders-empty"), () => settings);
-ledger.onBalancesChange((list) => reminders.update(list));
+const balancesEmpty = $("balances-empty");
+ledger.onBalancesChange((list) => {
+  balancesEmpty.hidden = list.length > 0;
+  reminders.update(list);
+});
 
 function markUpi(): void {
   const v = upiInput.value.trim();
@@ -72,16 +76,33 @@ let previewUrl: string | null = null;
 
 const STATUS_TEXT: Record<GemmaStatus, string> = {
   checking: "Checking Gemma...",
-  loading: "Gemma loading (first time takes a minute)...",
+  loading: "Gemma loading...",
   ready: "Gemma ready",
-  down: "Ollama not running: run `ollama serve`",
-  "no-model": "Gemma not installed: run `ollama pull gemma4:e2b`",
+  down: "Ollama not running: run ollama serve",
+  "no-model": "Gemma not installed",
 };
+
+const ollamaHelp = $("ollama-help");
+const ollamaHelpMsg = $("ollama-help-msg");
+const ollamaHelpCmd = $("ollama-help-cmd");
+const retryBtn = $<HTMLButtonElement>("ollama-retry");
 
 function setStatus(s: GemmaStatus): void {
   statusEl.textContent = STATUS_TEXT[s];
   statusEl.dataset.state = s;
+  const problem = s === "down" || s === "no-model";
+  ollamaHelp.hidden = !problem;
+  retryBtn.disabled = s === "checking" || s === "loading";
+  if (s === "down") {
+    ollamaHelpMsg.textContent = "Ollama isn't running, so Gemma can't read photos or write reminders yet.";
+    ollamaHelpCmd.textContent = "ollama serve";
+  } else if (s === "no-model") {
+    ollamaHelpMsg.textContent = "Ollama is running, but the Gemma 4 model isn't installed.";
+    ollamaHelpCmd.textContent = "ollama pull gemma4:e2b";
+  }
 }
+
+retryBtn.addEventListener("click", () => void warmUp(setStatus));
 
 function showError(message: string, raw?: string): void {
   errorMsg.textContent = message;
@@ -103,7 +124,7 @@ async function loadPhoto(blob: Blob, label: string): Promise<void> {
   if (previewUrl) URL.revokeObjectURL(previewUrl);
   previewUrl = URL.createObjectURL(blob);
   previewImg.src = previewUrl;
-  previewMeta.textContent = `${label} - sent as ${current.width} x ${current.height}, ${Math.round(current.bytes / 1024)} KB`;
+  previewMeta.textContent = `${label}: resized to ${current.width} × ${current.height} px (${Math.round(current.bytes / 1024)} KB) for Gemma`;
   preview.hidden = false;
   readBtn.disabled = false;
 }
@@ -125,8 +146,10 @@ readBtn.addEventListener("click", async () => {
   if (!current) return;
   errorBox.hidden = true;
   readBtn.disabled = true;
+  readBtn.textContent = "Reading...";
   progress.hidden = false;
-  progress.textContent = "Gemma padh raha hai...";
+  progress.dataset.busy = "true";
+  progress.textContent = "Gemma padh raha hai... (the first read can take up to a minute)";
   const started = performance.now();
   try {
     const result = await extractEntries(current.base64);
@@ -141,12 +164,17 @@ readBtn.addEventListener("click", async () => {
   } catch (err) {
     progress.hidden = true;
     if (err instanceof GemmaParseError) {
-      showError("Gemma's answer didn't make sense, even after a retry.", err.raw);
+      showError("Gemma's answer didn't make sense, even after a retry. Try a sharper photo, or add the rows by hand.", err.raw);
+    } else if (err instanceof OllamaDownError) {
+      setStatus("down");
+      showError(err.message);
     } else {
       showError(err instanceof Error ? err.message : "Something went wrong.");
     }
   } finally {
     readBtn.disabled = false;
+    readBtn.textContent = "Read with Gemma";
+    delete progress.dataset.busy;
   }
 });
 
