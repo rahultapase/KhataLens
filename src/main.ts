@@ -2,6 +2,8 @@ import "./styles.css";
 import { extractEntries, GemmaParseError, warmUp, type GemmaStatus } from "./gemma.ts";
 import { fetchSample, prepareImage, type PreparedImage } from "./image.ts";
 import { LedgerView } from "./ledgerView.ts";
+import { RemindersView } from "./reminders.ts";
+import { isValidUpi, loadSettings, saveSettings } from "./settings.ts";
 
 function $<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -31,6 +33,33 @@ const ledger = new LedgerView(
   $("grand-total"),
   $("entry-count"),
 );
+
+// Settings + reminders
+const settings = loadSettings();
+const shopInput = $<HTMLInputElement>("shop-name");
+const upiInput = $<HTMLInputElement>("upi-id");
+shopInput.value = settings.shop;
+upiInput.value = settings.upi;
+
+const reminders = new RemindersView($("reminder-list"), $("reminders-empty"), () => settings);
+ledger.onBalancesChange((list) => reminders.update(list));
+
+function markUpi(): void {
+  const v = upiInput.value.trim();
+  upiInput.setAttribute("aria-invalid", String(v !== "" && !isValidUpi(v)));
+}
+markUpi();
+shopInput.addEventListener("input", () => {
+  settings.shop = shopInput.value;
+  saveSettings(settings);
+});
+shopInput.addEventListener("change", () => reminders.render());
+upiInput.addEventListener("input", () => {
+  settings.upi = upiInput.value.trim();
+  saveSettings(settings);
+  markUpi();
+});
+upiInput.addEventListener("change", () => reminders.render());
 
 $("add-row").addEventListener("click", () => ledger.addBlank());
 $("clear-ledger").addEventListener("click", () => {

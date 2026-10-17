@@ -79,6 +79,25 @@
           <strong id="grand-total">₹0</strong>
         </p>
       </section>
+
+      <section class="panel" aria-labelledby="reminders-title">
+        <h2 id="reminders-title">4. Send polite reminders</h2>
+        <fieldset class="settings">
+          <legend>Shop details</legend>
+          <div class="field">
+            <label for="shop-name">Shop name</label>
+            <input id="shop-name" type="text" autocomplete="organization" />
+          </div>
+          <div class="field">
+            <label for="upi-id">UPI ID <span class="muted">(optional)</span></label>
+            <input id="upi-id" type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="sharmastore@okaxis" aria-describedby="upi-hint" />
+            <p id="upi-hint" class="hint">Added to each message as plain text. The "UPI pay link" button only opens on a phone with a UPI app.</p>
+          </div>
+        </fieldset>
+        <p class="hint">Nothing is sent automatically. Copy the message, or open WhatsApp, pick the customer and tap send yourself.</p>
+        <p id="reminders-empty" class="empty">Nobody owes anything right now.</p>
+        <ul id="reminder-list" class="reminder-list"></ul>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

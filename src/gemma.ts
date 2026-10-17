@@ -166,6 +166,88 @@ export async function extractEntries(imageBase64: string): Promise<Extraction> {
   throw lastError ?? new GemmaParseError("");
 }
 
+export type Tone = "polite" | "friendly" | "firm";
+
+const TONE_GUIDE: Record<Tone, string> = {
+  polite: "Polite: warm, humble and gentle. No deadline.",
+  friendly: "Friendly: casual and cheerful, like a neighbourhood shopkeeper who knows them well (for example 'kaise ho', 'jab time mile'). No deadline.",
+  firm: "Firm but respectful: clearly ask them to clear the amount is hafte (this week). Still courteous, never rude.",
+};
+
+const REMINDER_SYSTEM = `You write short WhatsApp payment reminders for a small Indian kirana shop.
+Write in Roman-script Hinglish: mostly Hindi words written in English letters, with a few simple English words. Never use Devanagari. Do not write the whole message in English.
+Language example only (match the language mix, but use your own wording and follow the requested tone): "Namaste Sunil ji, Gupta Kirana se yaad dila rahe hain ki aapka ₹250 baaki hai. Jab suvidha ho, chuka dijiye. Dhanyavaad!"
+Rules:
+- At most 60 words.
+- Always respectful. Use "ji". No threats, no shaming, no guilt, no legal words, no mention of other customers.
+- Must include the customer's name, the exact amount written as given (for example "₹370"), and the shop name.
+- Do not mention UPI or payment apps; that is added separately.
+- Output only the message text. No quotes, no title, no notes, no options.`;
+
+export interface ReminderInput {
+  name: string;
+  amount: string; // already formatted, e.g. "₹370"
+  shop: string;
+  tone: Tone;
+}
+
+function cleanText(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^(message|reminder)\s*:\s*/i, "")
+    .replace(/\*\*/g, "")
+    .replace(/^["'“”]+|["'“”]+$/g, "")
+    .trim();
+}
+
+function digits(s: string): string {
+  return s.replace(/[^\d.]/g, "").replace(/\.0+$/, "");
+}
+
+function reminderOk(text: string, input: ReminderInput): boolean {
+  const lower = text.toLowerCase();
+  const words = text.split(/\s+/).filter(Boolean).length;
+  return (
+    words > 5 &&
+    words <= 70 &&
+    lower.includes(input.name.toLowerCase()) &&
+    text.replace(/,/g, "").includes(digits(input.amount)) &&
+    lower.includes(input.shop.toLowerCase()) &&
+    !/[\u0900-\u097F]/.test(text)
+  );
+}
+
+/** Deterministic message used only if Gemma's answer misses the name, amount or shop twice. */
+export function templateReminder({ name, amount, shop, tone }: ReminderInput): string {
+  switch (tone) {
+    case "friendly":
+      return `Namaste ${name} ji! ${shop} se yaad dila rahe the, aapka ${amount} baaki hai. Jab bhi time mile, de dijiye. Shukriya!`;
+    case "firm":
+      return `Namaste ${name} ji, ${shop} ki taraf se: aapka ${amount} kaafi din se baaki hai. Kripya is hafte tak clear kar dijiye. Dhanyavaad.`;
+    default:
+      return `Namaste ${name} ji, ${shop} se vinamra nivedan hai ki aapka ${amount} baaki hai. Suvidha anusaar chuka dijiye. Dhanyavaad.`;
+  }
+}
+
+/** Customer balance -> short Hinglish reminder. Retries once, then falls back to a template. */
+export async function writeReminder(input: ReminderInput): Promise<{ text: string; fromTemplate: boolean }> {
+  const user = `Customer: ${input.name}
+Amount due: ${input.amount}
+Shop name: ${input.shop}
+Tone: ${TONE_GUIDE[input.tone]}
+Write the reminder.`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const text = cleanText(
+      await chat([
+        { role: "system", content: REMINDER_SYSTEM },
+        { role: "user", content: user },
+      ]),
+    );
+    if (reminderOk(text, input)) return { text, fromTemplate: false };
+  }
+  return { text: templateReminder(input), fromTemplate: true };
+}
+
 export type GemmaStatus = "checking" | "loading" | "ready" | "down" | "no-model";
 
 /** Checks Ollama, then loads the model into memory (empty messages = load only). */
