@@ -9,6 +9,12 @@ interface ReminderState {
   text: string;
   busy: boolean;
   note: string;
+  /** Balance the current draft was written for, to spot outdated drafts. */
+  draftedFor?: number;
+}
+
+function isOutdated(s: ReminderState | undefined, c: CustomerBalance): boolean {
+  return !!s?.text && s.draftedFor !== undefined && s.draftedFor !== c.balance;
 }
 
 const TONES: { value: Tone; label: string }[] = [
@@ -156,9 +162,18 @@ export class HisaabView {
         el(
           "span",
           { className: "cust-note" },
-          s?.text ? "Reminder drafted" : st === "owes" ? "baaki" : st === "advance" ? "advance paid" : "hisaab clear",
+          st === "owes" && isOutdated(s, c)
+            ? "Reminder outdated"
+            : st === "owes" && s?.text
+              ? "Reminder drafted"
+              : st === "owes"
+                ? "baaki"
+                : st === "advance"
+                  ? "advance paid"
+                  : "hisaab clear",
         ),
       );
+      if (st === "owes" && isOutdated(s, c)) btn.dataset.outdated = "true";
       // Share of everything still to collect
       const share = total > 0 && c.balance > 0 ? c.balance / total : 0;
       const bar = el("span", { className: "cust-bar" });
@@ -168,7 +183,7 @@ export class HisaabView {
       btn.dataset.key = c.key;
       btn.dataset.state = st;
       if (this.changed.has(c.key)) bump(btn.querySelector(".cust-amount"));
-      if (s?.text) btn.dataset.drafted = "true";
+      if (s?.text && st === "owes" && !isOutdated(s, c)) btn.dataset.drafted = "true";
       if (c.key === this.selected) btn.setAttribute("aria-current", "true");
       btn.addEventListener("click", () => this.select(c.key));
       return el("li", {}, btn);
@@ -288,6 +303,7 @@ export class HisaabView {
       try {
         const res = await writeReminder({ name: c.name, amount, shop, tone: s.tone });
         s.text = finalMessage(res.text, this.getSettings());
+        s.draftedFor = c.balance;
         s.note = res.fromTemplate
           ? "Gemma's draft missed the name or amount, so a standard message is shown. Edit as you like."
           : "Drafted by Gemma. Read it once, then copy or open WhatsApp.";
@@ -311,9 +327,18 @@ export class HisaabView {
     );
     bubble.dataset.busy = String(s.busy);
 
+    // The balance moved (another page read, or an edit) after this draft was written
+    const warn = el("p", { className: "composer-warn", role: "status" });
+    if (isOutdated(s, c) && s.draftedFor !== undefined) {
+      warn.textContent = `The balance changed from ${formatINR(s.draftedFor)} to ${amount} after this message was written. Press "Write again" to update it.`;
+    } else {
+      warn.hidden = true;
+    }
+
     this.composer.replaceChildren(
       head,
       el("div", { className: "composer-controls" }, tones, write),
+      warn,
       bubble,
       actions,
       status,

@@ -53,7 +53,7 @@
       <!-- Left: the page itself, pinned while you check the ledger -->
       <section class="panel page-panel" aria-labelledby="capture-title">
         <div class="panel-head">
-          <h2 id="capture-title"><span class="step">1</span> Khata page</h2>
+          <h2 id="capture-title"><span class="step">1</span> Khata pages</h2>
         </div>
 
         <div id="stage" class="stage" data-state="empty">
@@ -63,8 +63,8 @@
               <circle cx="24" cy="25" r="7" fill="none" stroke="currentColor" stroke-width="2.5" />
               <path d="M17 12l3-5h8l3 5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
             </svg>
-            <p class="stage-title">Drop a photo of one khata page</p>
-            <p class="stage-hint">Flat, well lit, one page. It stays on this laptop.</p>
+            <p class="stage-title">Drop photos of khata pages</p>
+            <p class="stage-hint">One page per photo, flat and well lit. Add several to read a whole book. Photos stay on this laptop.</p>
           </div>
           <figure id="preview" class="preview" hidden>
             <img id="preview-img" alt="The khata page you selected" />
@@ -72,11 +72,12 @@
           </figure>
         </div>
         <p id="preview-meta" class="meta" hidden></p>
+        <ol id="page-strip" class="page-strip" aria-label="Selected photos" hidden></ol>
 
         <div class="capture-actions">
           <label class="btn btn-secondary file-btn">
-            <input id="photo-input" type="file" accept="image/*" capture="environment" class="visually-hidden" />
-            <span>Choose photo</span>
+            <input id="photo-input" type="file" accept="image/*" capture="environment" multiple class="visually-hidden" />
+            <span>Choose photos</span>
           </label>
           <button id="sample-btn" type="button" class="btn btn-secondary">Try sample page</button>
         </div>

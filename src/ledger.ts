@@ -12,6 +12,8 @@ export interface Entry {
   source?: "gemma" | "manual";
   /** True once the shopkeeper changed a Gemma row by hand. */
   edited?: boolean;
+  /** Khata page number this row was read from (1, 2, 3...). */
+  page?: number;
 }
 
 export interface CustomerBalance {
@@ -66,6 +68,7 @@ export function load(): Entry[] {
         kind: e.kind === "jama" ? ("jama" as const) : ("udhaar" as const),
         source: e.source === "gemma" ? ("gemma" as const) : ("manual" as const),
         edited: e.edited === true,
+        page: Number.isInteger(e.page) && (e.page as number) > 0 ? e.page : undefined,
       }));
   } catch {
     return [];

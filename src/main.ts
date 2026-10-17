@@ -6,6 +6,7 @@ import { LedgerView } from "./ledgerView.ts";
 import { HisaabView } from "./reminders.ts";
 import { isValidUpi, loadSettings, saveSettings, shopName } from "./settings.ts";
 import { csvFilename, downloadCsv, ledgerCsv } from "./csv.ts";
+import { fingerprint, PageRegistry } from "./pages.ts";
 
 function $<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -106,7 +107,10 @@ upiInput.addEventListener("change", () => hisaab.refresh());
 $("add-row").addEventListener("click", () => ledger.addBlank());
 $("clear-ledger").addEventListener("click", () => {
   if (ledger.size === 0) return;
-  if (window.confirm(`Clear all ${ledger.size} entries? This can't be undone.`)) ledger.clear();
+  if (window.confirm(`Clear all ${ledger.size} entries? This can't be undone.`)) {
+    ledger.clear();
+    resetPages();
+  }
 });
 
 // ---------- Theme ----------
@@ -168,10 +172,25 @@ function setStatus(s: GemmaStatus): void {
 
 retryBtn.addEventListener("click", () => void warmUp(setStatus));
 
-// ---------- Photo ----------
+// ---------- Photos: one page or many ----------
 
-let current: PreparedImage | null = null;
-let previewUrl: string | null = null;
+type PageStatus = "queued" | "reading" | "done" | "error" | "skipped";
+
+interface QueuedPage {
+  label: string;
+  url: string;
+  image: PreparedImage;
+  fp: string;
+  status: PageStatus;
+  note: string;
+  pageNo?: number;
+}
+
+const registry = new PageRegistry();
+const strip = $("page-strip");
+let queue: QueuedPage[] = [];
+let shown = 0;
+let reading = false;
 
 function showError(message: string, raw?: string): void {
   errorMsg.textContent = message;
@@ -180,46 +199,126 @@ function showError(message: string, raw?: string): void {
   errorBox.hidden = false;
 }
 
-async function loadPhoto(blob: Blob, label: string): Promise<void> {
-  errorBox.hidden = true;
-  progress.hidden = true;
-  readBtn.disabled = true;
-  if (!blob.type.startsWith("image/")) {
-    showError("That file isn't a photo. Choose a JPG or PNG of the khata page.");
+function pending(): QueuedPage[] {
+  return queue.filter((p) => p.status === "queued" || p.status === "error");
+}
+
+function statusText(p: QueuedPage): string {
+  const before = registry.pageOf(p.fp);
+  switch (p.status) {
+    case "reading":
+      return "Reading...";
+    case "done":
+      return `Page ${p.pageNo} · ${p.note}`;
+    case "error":
+      return p.note || "Couldn't read";
+    case "skipped":
+      return "Skipped, already read";
+    default:
+      return before ? `Already read (page ${before})` : "Ready";
+  }
+}
+
+function renderPages(): void {
+  const page = queue[shown];
+  if (!page) {
+    preview.hidden = true;
+    previewMeta.hidden = true;
+    stageEmpty.hidden = false;
+    stage.dataset.state = "empty";
+    strip.hidden = true;
+    readBtn.disabled = true;
+    readBtn.textContent = "Read with Gemma";
     return;
   }
-  try {
-    current = await prepareImage(blob);
-  } catch (err) {
-    current = null;
-    showError(err instanceof Error ? err.message : "Could not open that photo.");
-    return;
-  }
-  if (previewUrl) URL.revokeObjectURL(previewUrl);
-  previewUrl = URL.createObjectURL(blob);
-  previewImg.src = previewUrl;
-  previewMeta.textContent = `${label} · sent to Gemma as ${current.width} × ${current.height} px, ${Math.round(current.bytes / 1024)} KB`;
+
+  previewImg.src = page.url;
+  const position = queue.length > 1 ? ` · photo ${shown + 1} of ${queue.length}` : "";
+  previewMeta.textContent = `${page.label}${position} · sent to Gemma as ${page.image.width} × ${page.image.height} px, ${Math.round(page.image.bytes / 1024)} KB`;
   previewMeta.hidden = false;
   preview.hidden = false;
   stageEmpty.hidden = true;
   stage.dataset.state = "loaded";
-  readBtn.disabled = false;
+
+  // Thumbnail strip, only when there is more than one photo
+  strip.hidden = queue.length < 2;
+  strip.replaceChildren(
+    ...queue.map((p, i) => {
+      const img = Object.assign(document.createElement("img"), { src: p.url, alt: "" });
+      const name = Object.assign(document.createElement("span"), { className: "thumb-name", textContent: `Photo ${i + 1}` });
+      const state = Object.assign(document.createElement("span"), { className: "thumb-state", textContent: statusText(p) });
+      const btn = Object.assign(document.createElement("button"), { type: "button", className: "thumb" });
+      btn.append(img, name, state);
+      btn.dataset.status = p.status;
+      if (registry.pageOf(p.fp) && p.status === "queued") btn.dataset.duplicate = "true";
+      btn.setAttribute("aria-label", `Show photo ${i + 1}, ${p.label}: ${statusText(p)}`);
+      if (i === shown) btn.setAttribute("aria-current", "true");
+      btn.addEventListener("click", () => {
+        shown = i;
+        renderPages();
+        strip.querySelectorAll<HTMLButtonElement>(".thumb")[i]?.focus();
+      });
+      const li = document.createElement("li");
+      li.append(btn);
+      return li;
+    }),
+  );
+
+  if (!reading) {
+    const n = pending().length;
+    readBtn.textContent = n > 1 ? `Read ${n} pages with Gemma` : "Read with Gemma";
+    readBtn.disabled = false;
+  }
+}
+
+async function loadPhotos(files: Blob[], labels: string[]): Promise<void> {
+  if (reading) return;
+  errorBox.hidden = true;
+  progress.hidden = true;
+  const picked = files.map((f, i) => ({ blob: f, label: labels[i] ?? `Photo ${i + 1}` }));
+  const images = picked.filter((p) => p.blob.type.startsWith("image/"));
+  const notImages = picked.length - images.length;
+  if (images.length === 0) {
+    showError("That file isn't a photo. Choose JPG or PNG photos of the khata pages.");
+    return;
+  }
+
+  readBtn.disabled = true;
+  for (const p of queue) URL.revokeObjectURL(p.url);
+  queue = [];
+  const failed: string[] = [];
+  for (const { blob, label } of images) {
+    try {
+      const image = await prepareImage(blob);
+      queue.push({ label, url: URL.createObjectURL(blob), image, fp: await fingerprint(image.base64), status: "queued", note: "" });
+    } catch {
+      failed.push(label);
+    }
+  }
+  shown = 0;
+  renderPages();
+
+  const problems: string[] = [];
+  if (failed.length) problems.push(`Couldn't open ${failed.join(", ")}.`);
+  if (notImages) problems.push(`Skipped ${notImages} file(s) that aren't photos.`);
+  if (problems.length) showError(problems.join(" "));
 }
 
 photoInput.addEventListener("change", () => {
-  const file = photoInput.files?.[0];
-  if (file) void loadPhoto(file, file.name);
+  const files = [...(photoInput.files ?? [])];
+  if (files.length) void loadPhotos(files, files.map((f) => f.name));
+  photoInput.value = ""; // allow choosing the same photo again
 });
 
 sampleBtn.addEventListener("click", async () => {
   try {
-    await loadPhoto(await fetchSample(), "Sample page");
+    await loadPhotos([await fetchSample()], ["Sample page"]);
   } catch (err) {
     showError(err instanceof Error ? err.message : "Sample page not found.");
   }
 });
 
-// Drag and drop onto the stage
+// Drag and drop onto the stage (one or many photos)
 stage.addEventListener("dragover", (e) => {
   e.preventDefault();
   stage.dataset.drag = "true";
@@ -228,14 +327,49 @@ stage.addEventListener("dragleave", () => delete stage.dataset.drag);
 stage.addEventListener("drop", (e) => {
   e.preventDefault();
   delete stage.dataset.drag;
-  const file = e.dataTransfer?.files?.[0];
-  if (file) void loadPhoto(file, file.name);
+  const files = [...(e.dataTransfer?.files ?? [])];
+  if (files.length) void loadPhotos(files, files.map((f) => f.name));
 });
 
-// ---------- Read with Gemma ----------
+/** After "Clear ledger": forget what was read so every photo can be read again. */
+function resetPages(): void {
+  registry.clear();
+  for (const p of queue) {
+    if (p.status === "done" || p.status === "skipped") {
+      p.status = "queued";
+      p.note = "";
+      p.pageNo = undefined;
+    }
+  }
+  renderPages();
+}
+
+// ---------- Read with Gemma (page by page) ----------
 
 readBtn.addEventListener("click", async () => {
-  if (!current) return;
+  if (reading || queue.length === 0) return;
+  let targets = pending();
+  if (targets.length === 0) targets = [...queue]; // everything read already: offer to read again
+
+  // Catch photos that are already in the ledger before adding their rows twice
+  const dups = targets.filter((p) => registry.pageOf(p.fp) > 0);
+  if (dups.length) {
+    const names = dups.map((p) => `${p.label} (page ${registry.pageOf(p.fp)})`).join(", ");
+    const again = window.confirm(
+      `${dups.length === 1 ? "This photo is" : "These photos are"} already in the ledger: ${names}.\n\n` +
+        "OK reads them again and adds their rows a second time. Cancel skips them.",
+    );
+    if (!again) {
+      for (const p of dups) p.status = "skipped";
+      targets = targets.filter((p) => !dups.includes(p));
+    }
+  }
+  if (targets.length === 0) {
+    renderPages();
+    return;
+  }
+
+  reading = true;
   errorBox.hidden = true;
   readBtn.disabled = true;
   readBtn.textContent = "Gemma padh raha hai...";
@@ -243,36 +377,74 @@ readBtn.addEventListener("click", async () => {
   stage.dataset.reading = "true";
   progress.hidden = false;
   progress.dataset.tone = "busy";
-  progress.textContent = "Reading the page on this laptop. The first read can take up to a minute.";
+
   const started = performance.now();
-  try {
-    const result = await extractEntries(current.base64);
-    const secs = ((performance.now() - started) / 1000).toFixed(1);
-    extractJson.textContent = JSON.stringify(result, null, 2);
-    ledger.addFromGemma(result.entries);
-    const skipped =
-      result.unreadable_lines > 0 ? ` ${result.unreadable_lines} line(s) were unreadable; add them by hand.` : "";
+  const results: unknown[] = [];
+  const failures: string[] = [];
+  let lastRaw: string | undefined;
+  let pagesRead = 0;
+  let entriesRead = 0;
+  let unreadable = 0;
+
+  for (let i = 0; i < targets.length; i++) {
+    const p = targets[i];
+    p.status = "reading";
+    shown = queue.indexOf(p);
+    renderPages();
+    progress.textContent =
+      targets.length > 1
+        ? `Reading page ${i + 1} of ${targets.length}... The first read can take up to a minute.`
+        : "Reading the page on this laptop. The first read can take up to a minute.";
+    try {
+      const result = await extractEntries(p.image.base64);
+      if (result.entries.length === 0) {
+        p.status = "error";
+        p.note = "No entries found";
+        failures.push(`${p.label}: Gemma couldn't find any entries.`);
+        continue;
+      }
+      const pageNo = registry.add(p.fp);
+      ledger.addFromGemma(result.entries, pageNo);
+      results.push({ page: pageNo, photo: p.label, ...result });
+      extractJson.textContent = JSON.stringify(results, null, 2);
+      p.status = "done";
+      p.pageNo = pageNo;
+      p.note = `${result.entries.length} entries`;
+      pagesRead++;
+      entriesRead += result.entries.length;
+      unreadable += result.unreadable_lines;
+    } catch (err) {
+      p.status = "error";
+      p.note = "Couldn't read";
+      if (err instanceof OllamaDownError) {
+        setStatus("down");
+        failures.push(err.message);
+        break; // no point trying the remaining pages
+      } else if (err instanceof GemmaParseError) {
+        lastRaw = err.raw;
+        failures.push(`${p.label}: Gemma's answer didn't make sense, even after a retry.`);
+      } else {
+        failures.push(`${p.label}: ${err instanceof Error ? err.message : "something went wrong."}`);
+      }
+    }
+  }
+
+  reading = false;
+  readBtn.removeAttribute("aria-busy");
+  delete stage.dataset.reading;
+  renderPages();
+
+  const secs = ((performance.now() - started) / 1000).toFixed(1);
+  if (pagesRead > 0) {
+    const what = pagesRead > 1 ? `${pagesRead} pages, ${entriesRead} entries` : `${entriesRead} entries`;
+    const extra = unreadable > 0 ? ` ${unreadable} line(s) were unreadable; add them by hand.` : "";
     progress.dataset.tone = "done";
-    progress.textContent = `Read ${result.entries.length} entries in ${secs} s. Check them in the ledger.${skipped}`;
-    if (result.entries.length === 0) {
-      progress.hidden = true;
-      showError("Gemma couldn't find any entries. Try a sharper, well-lit photo of one page.");
-    }
-  } catch (err) {
+    progress.textContent = `Read ${what} in ${secs} s. Check them in the ledger.${extra}`;
+  } else {
     progress.hidden = true;
-    if (err instanceof GemmaParseError) {
-      showError("Gemma's answer didn't make sense, even after a retry. Try a sharper photo, or add the rows by hand.", err.raw);
-    } else if (err instanceof OllamaDownError) {
-      setStatus("down");
-      showError(err.message);
-    } else {
-      showError(err instanceof Error ? err.message : "Something went wrong.");
-    }
-  } finally {
-    readBtn.disabled = false;
-    readBtn.textContent = "Read with Gemma";
-    readBtn.removeAttribute("aria-busy");
-    delete stage.dataset.reading;
+  }
+  if (failures.length) {
+    showError(`${failures.join(" ")} Try a sharper, well-lit photo, or add the rows by hand.`, lastRaw);
   }
 });
 

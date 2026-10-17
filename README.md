@@ -20,7 +20,10 @@ notebook he already keeps.
 
 ## What it does
 
-1. **Photo in.** Take or drop a photo of one page, or press "Try sample page".
+1. **Photos in.** Take or drop one photo per page (several at once for a whole book), or press
+   "Try sample page". Pages are read one after another, every row is tagged with its page
+   (P1, P2...), and the same customer on different pages adds up into one balance. Re-adding a
+   photo that is already in the ledger asks before counting it twice.
 2. **Gemma reads it.** Gemma 4's vision model turns each handwritten line into a structured entry:
    customer, item, date, amount, and whether it's udhaar (credit given) or jama (payment received).
 3. **You check it.** The ledger sits next to the photo. Fix any misread; corrected rows are tagged
@@ -101,6 +104,7 @@ so there is no CORS setup and no API key.
 src/
   gemma.ts       Ollama calls: extraction (schema), reminders, warm-up
   image.ts       Downscale to 1280 px JPEG, base64
+  pages.ts       Which photos are already read (SHA-256 fingerprints only)
   ledger.ts      Entries, balances, localStorage
   ledgerView.ts  Editable ledger table
   reminders.ts   Hisaab list + reminder composer
@@ -117,6 +121,7 @@ src/
   copy and open.
 - **Devanagari and Marathi notebooks.** Today the prompt and the sample target Roman-script
   Hinglish entries with English numerals.
-- **Multi-page books.** Read several pages in one go and merge them by date.
+- **Smarter multi-page books.** Spot the same line photographed twice from different angles,
+  and match name spellings across pages ("Ramesh" vs "Rameshbhai").
 - **Voice entry.** "Ramesh, atta paanch kilo, do sau pachaas" straight into the ledger.
 - Partial payments linked to specific udhaar lines, and reminder history per customer.

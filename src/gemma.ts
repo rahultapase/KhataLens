@@ -59,6 +59,7 @@ Each line usually has: date, customer name, item(s), amount in rupees.
 Rules:
 - A line naming a customer with an amount is "udhaar" (credit given to the customer).
 - If the line says jama, paid, diya, received, or similar, it is "jama" (payment received from the customer).
+- Decide every line on its own, never from the lines around it. A line with goods (atta, dal, doodh, tel, ande, chai...) is always "udhaar".
 - Read numbers literally, exactly as written. Do not add, round or calculate.
 - One entry per written line. Do not invent rows. Skip headings and totals.
 - If the date or item is unclear or missing, set it to null. For jama lines, item is null.
@@ -117,6 +118,9 @@ async function chat(
   return data.message?.content ?? "";
 }
 
+/** An "item" that is really a payment note: jama, paid, diya, received, cash... */
+const PAYMENT_WORDS = /^(jama|jma|paid|pay|payment|diya|diye|di|received|recd|rcvd|wapas|cash|upi|online)\b[\s.:-]*\d*\s*$/i;
+
 function parseExtraction(raw: string): Extraction {
   let parsed: unknown;
   try {
@@ -135,12 +139,22 @@ function parseExtraction(raw: string): Extraction {
     const customer = typeof r.customer === "string" ? r.customer.trim() : "";
     const amount = typeof r.amount === "number" ? r.amount : Number(r.amount);
     if (!customer || !Number.isFinite(amount)) continue;
+    let item = typeof r.item === "string" && r.item.trim() ? r.item.trim() : null;
+    let kind: EntryKind = r.kind === "jama" ? "jama" : "udhaar";
+    // Khata rule, applied in code because the model can drift into labelling a
+    // run of lines the same way: a payment word means jama; real goods mean udhaar.
+    if (item && PAYMENT_WORDS.test(item)) {
+      kind = "jama";
+      item = null;
+    } else if (item) {
+      kind = "udhaar";
+    }
     entries.push({
       customer,
       amount: Math.abs(amount),
-      kind: r.kind === "jama" ? "jama" : "udhaar",
+      kind,
       date: typeof r.date === "string" && r.date.trim() ? r.date.trim() : null,
-      item: typeof r.item === "string" && r.item.trim() ? r.item.trim() : null,
+      item,
     });
   }
   const unreadable = Number(p.unreadable_lines);

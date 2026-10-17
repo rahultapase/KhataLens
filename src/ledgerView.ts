@@ -46,8 +46,8 @@ export class LedgerView {
   /** Rows that just arrived from Gemma; they animate in once. */
   private fresh = new Set<string>();
 
-  addFromGemma(raw: RawEntry[]): void {
-    const added = raw.map((r) => ({ ...fromRaw(r), source: "gemma" as const }));
+  addFromGemma(raw: RawEntry[], page?: number): void {
+    const added = raw.map((r) => ({ ...fromRaw(r), source: "gemma" as const, page }));
     for (const e of added) this.fresh.add(e.id);
     this.entries.push(...added);
     this.commit(true);
@@ -97,6 +97,9 @@ export class LedgerView {
   private renderTable(): void {
     const rows = this.entries.map((entry, i) => this.row(entry, i));
     this.tbody.replaceChildren(...rows);
+    // Page tags only matter once rows come from more than one page
+    const pages = new Set(this.entries.map((e) => e.page).filter(Boolean));
+    this.tableWrap.dataset.multipage = String(pages.size > 1);
     const empty = this.entries.length === 0;
     this.emptyState.hidden = !empty;
     this.tableWrap.hidden = empty;
@@ -178,6 +181,13 @@ export class LedgerView {
     tr.dataset.id = entry.id;
     tr.dataset.kind = entry.kind;
     if (entry.edited) tr.dataset.edited = "true";
+    // Which khata page the row came from, shown once the ledger spans several pages
+    if (entry.page) {
+      const tag = el("span", { className: "page-tag", title: `Read from page ${entry.page}` }, `P${entry.page}`);
+      tag.setAttribute("aria-label", `page ${entry.page}`);
+      tr.querySelector(".col-date")?.append(tag);
+      tr.dataset.page = String(entry.page);
+    }
     if (this.fresh.has(entry.id)) {
       tr.dataset.fresh = "true";
       tr.style.setProperty("--i", String(index - (this.entries.length - this.fresh.size)));
