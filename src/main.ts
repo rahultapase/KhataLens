@@ -4,7 +4,8 @@ import { fetchSample, prepareImage, type PreparedImage } from "./image.ts";
 import { formatINR } from "./ledger.ts";
 import { LedgerView } from "./ledgerView.ts";
 import { HisaabView } from "./reminders.ts";
-import { isValidUpi, loadSettings, saveSettings } from "./settings.ts";
+import { isValidUpi, loadSettings, saveSettings, shopName } from "./settings.ts";
+import { csvFilename, downloadCsv, ledgerCsv } from "./csv.ts";
 
 function $<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -52,7 +53,13 @@ const hisaab = new HisaabView(
   () => settings,
 );
 const ledgerSum = $("ledger-sum");
+const csvBtn = $<HTMLButtonElement>("download-csv");
+csvBtn.addEventListener("click", () => {
+  if (ledger.size === 0) return;
+  downloadCsv(ledgerCsv(ledger.snapshot(), shopName(settings)), csvFilename());
+});
 ledger.onBalancesChange((list) => {
+  csvBtn.disabled = ledger.size === 0;
   hisaab.update(list);
   // One-line arithmetic under the table: udhaar - jama = baaki
   const udhaar = list.reduce((s, c) => s + c.udhaar, 0);

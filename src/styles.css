@@ -413,6 +413,12 @@ code {
   cursor: progress;
 }
 
+.btn-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
 .btn-sm {
   font-size: 0.875rem;
   padding: 0 0.875rem;

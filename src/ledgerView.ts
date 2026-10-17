@@ -38,6 +38,11 @@ export class LedgerView {
     return this.entries.length;
   }
 
+  /** A copy of the current entries, for export. */
+  snapshot(): Entry[] {
+    return this.entries.map((e) => ({ ...e }));
+  }
+
   /** Rows that just arrived from Gemma; they animate in once. */
   private fresh = new Set<string>();
 
